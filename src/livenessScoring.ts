@@ -1,22 +1,14 @@
 import type { FaceData, FeedbackMessage } from './types';
 
 const WEIGHTS = {
-  faceDetected: 0.20,
-  faceSize: 0.20,
-  headPose: 0.30,
-  eyesOpen: 0.30,
+  faceDetected: 0.2,
+  faceSize: 0.2,
+  headPose: 0.3,
+  eyesOpen: 0.3,
 } as const;
 
-/**
- * Ideal face width is 20%–65% of the frame width.
- * Outside this range the face is too far or too close.
- */
-const FACE_SIZE_MIN = 0.20;
+const FACE_SIZE_MIN = 0.2;
 const FACE_SIZE_MAX = 0.65;
-
-/**
- * Maximum yaw/pitch deviation from frontal before penalising head pose.
- */
 const MAX_YAW_DEG = 20;
 const MAX_PITCH_DEG = 20;
 
@@ -63,9 +55,6 @@ export function rollingAverage(scores: number[]): number {
   return scores.reduce((a, b) => a + b, 0) / scores.length;
 }
 
-/**
- * Returns a human-readable hint based on the most recent face reading.
- */
 export function getFeedback(
   face: FaceData,
   frameWidth: number,

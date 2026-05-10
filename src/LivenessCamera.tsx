@@ -15,6 +15,7 @@ import {
 import {
   Canvas,
   Circle,
+  FillType,
   Group,
   Paint,
   Path,
@@ -23,8 +24,8 @@ import {
 import { useLivenessCamera } from './useLivenessCamera';
 import type { LivenessCameraProps, LivenessState } from './types';
 
-const OVAL_H_RATIO = 0.55; // oval width as fraction of container width
-const OVAL_V_RATIO = 0.72; // oval height as fraction of container height
+const OVAL_H_RATIO = 0.55;
+const OVAL_V_RATIO = 0.72;
 const STROKE_WIDTH = 3;
 
 function getOvalColor(state: LivenessState): string {
@@ -33,9 +34,9 @@ function getOvalColor(state: LivenessState): string {
     case 'countdown':
     case 'capturing':
     case 'done':
-      return '#4CAF50'; // green
+      return '#4CAF50';
     default:
-      return '#FFFFFF'; // white
+      return '#FFFFFF';
   }
 }
 
@@ -54,42 +55,26 @@ function OvalOverlay({
   const cy = height / 2;
   const rx = (width * OVAL_H_RATIO) / 2;
   const ry = (height * OVAL_V_RATIO) / 2;
-
   const color = getOvalColor(state);
 
-  // Build a path that covers the full canvas with an oval cutout
   const path = Skia.Path.Make();
   path.addRect(Skia.XYWHRect(0, 0, width, height));
   path.addOval(Skia.XYWHRect(cx - rx, cy - ry, rx * 2, ry * 2));
-  path.setFillType('evenOdd');
+  path.setFillType(FillType.EvenOdd);
 
-  // The oval border path alone
   const ovalPath = Skia.Path.Make();
   ovalPath.addOval(Skia.XYWHRect(cx - rx, cy - ry, rx * 2, ry * 2));
 
+  const showDot =
+    state === 'confirmed' || state === 'countdown' || state === 'capturing';
+
   return (
     <Canvas style={StyleSheet.absoluteFill}>
-      {/* Dark scrim outside the oval */}
       <Path path={path} color="rgba(0,0,0,0.55)" />
-
-      {/* Oval border */}
       <Group>
-        <Path
-          path={ovalPath}
-          style="stroke"
-          strokeWidth={STROKE_WIDTH}
-          color={color}
-        />
-        {/* Subtle glow dot in confirmed state */}
-        {(state === 'confirmed' ||
-          state === 'countdown' ||
-          state === 'capturing') && (
-          <Circle
-            cx={cx}
-            cy={cy - ry - 8}
-            r={5}
-            color={color}
-          >
+        <Path path={ovalPath} style="stroke" strokeWidth={STROKE_WIDTH} color={color} />
+        {showDot && (
+          <Circle cx={cx} cy={cy - ry - 8} r={5} color={color}>
             <Paint color={color} />
           </Circle>
         )}
@@ -164,7 +149,6 @@ export function LivenessCamera({
     []
   );
 
-  // Request permission on mount if not already granted
   useEffect(() => {
     if (!hasPermission) {
       requestPermission().catch(() => {
@@ -191,41 +175,30 @@ export function LivenessCamera({
 
   return (
     <View style={[styles.root, style]} onLayout={handleLayout}>
-      {/* Camera feed */}
       <Camera
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
         device={device}
-        isActive={
-          livenessState !== 'done' && livenessState !== 'error'
-        }
+        isActive={livenessState !== 'done' && livenessState !== 'error'}
         frameProcessor={frameProcessor}
         photo
         pixelFormat="yuv"
       />
-
-      {/* Oval overlay with scrim */}
       <OvalOverlay
         width={containerSize.width}
         height={containerSize.height}
         state={livenessState}
       />
-
-      {/* Feedback label */}
       {livenessState !== 'done' && (
         <View style={styles.feedbackContainer}>
           <Text style={styles.feedbackText}>{feedback}</Text>
         </View>
       )}
-
-      {/* Countdown bubble */}
       {livenessState === 'countdown' && countdown !== null && (
         <View style={styles.countdownContainer}>
           <CountdownBubble key={countdown} value={countdown} />
         </View>
       )}
-
-      {/* Done flash */}
       {livenessState === 'capturing' && (
         <View style={styles.captureFlash} pointerEvents="none" />
       )}

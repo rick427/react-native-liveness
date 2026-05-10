@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  runOnJS,
-  useFrameProcessor,
-} from 'react-native-vision-camera';
+import { runOnJS, useFrameProcessor } from 'react-native-worklets-core';
 import type { Camera } from 'react-native-vision-camera';
 import { useLivenessPlugin } from './LivenessDetector';
 import { getFeedback, rollingAverage, scoreFrame } from './livenessScoring';
-import type { CaptureResult, FaceData, FeedbackMessage, LivenessState } from './types';
+import type {
+  CaptureResult,
+  FaceData,
+  FeedbackMessage,
+  LivenessState,
+} from './types';
 
 const WINDOW_SIZE = 20;
 
@@ -71,11 +73,16 @@ export function useLivenessCamera(options: Options) {
       // Consumer must add shutter.mp3 to their app's main bundle
       // (iOS: drag into Xcode; Android: android/app/src/main/res/raw/shutter.mp3).
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const Sound = require('react-native-sound').default ?? require('react-native-sound');
+      const Sound =
+        require('react-native-sound').default ?? require('react-native-sound');
       Sound.setCategory('Playback');
-      const sound = new Sound('shutter.mp3', Sound.MAIN_BUNDLE, (err: Error | null) => {
-        if (!err) sound.play(() => sound.release());
-      });
+      const sound = new Sound(
+        'shutter.mp3',
+        Sound.MAIN_BUNDLE,
+        (err: Error | null) => {
+          if (!err) sound.play(() => sound.release());
+        }
+      );
     } catch {
       // react-native-sound not installed or sound file missing — silently skip
     }
@@ -91,11 +98,7 @@ export function useLivenessCamera(options: Options) {
     playShutter();
 
     try {
-      const photo = await cameraRef.current.takePhoto({
-        qualityPrioritization: 'quality',
-        flash: 'off',
-      });
-
+      const photo = await cameraRef.current.takePhoto({ flash: 'off' });
       const score = rollingAverage(frameScores.current);
 
       setLivenessState('done');
@@ -156,7 +159,6 @@ export function useLivenessCamera(options: Options) {
 
       const { total } = scoreFrame(safeFace, width);
 
-      // Update rolling window
       frameScores.current.push(total);
       if (frameScores.current.length > WINDOW_SIZE) {
         frameScores.current.shift();
@@ -176,11 +178,7 @@ export function useLivenessCamera(options: Options) {
 
       const feedback = getFeedback(safeFace, width, isLive);
 
-      setState((prev) => ({
-        ...prev,
-        livenessScore: avgScore,
-        feedback,
-      }));
+      setState((prev) => ({ ...prev, livenessScore: avgScore, feedback }));
 
       if (isLive && stateRef.current === 'scanning') {
         setLivenessState('confirmed');
@@ -208,7 +206,6 @@ export function useLivenessCamera(options: Options) {
     [plugin, handleFaceData]
   );
 
-  // Reset internal state if the hook remounts
   useEffect(() => {
     return () => {
       frameScores.current = [];

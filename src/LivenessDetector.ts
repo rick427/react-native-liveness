@@ -1,8 +1,5 @@
 import { useMemo } from 'react';
-import {
-  VisionCameraProxy,
-  type Frame,
-} from 'react-native-vision-camera';
+import { VisionCameraProxy, type Frame } from 'react-native-vision-camera';
 import type { FaceData } from './types';
 
 type LivenessPlugin = {
@@ -10,10 +7,7 @@ type LivenessPlugin = {
 };
 
 function createPlugin(): LivenessPlugin {
-  const plugin = VisionCameraProxy.initFrameProcessorPlugin(
-    'detectLiveness',
-    {}
-  );
+  const plugin = VisionCameraProxy.initFrameProcessorPlugin('detectLiveness', {});
 
   if (!plugin) {
     throw new Error(
@@ -26,7 +20,8 @@ function createPlugin(): LivenessPlugin {
     detectLiveness: (frame: Frame): FaceData | null => {
       'worklet';
       const result = plugin.call(frame);
-      return result as FaceData | null;
+      // plugin.call returns a loosely-typed BasicParameterType — cast via unknown
+      return result as unknown as FaceData | null;
     },
   };
 }
