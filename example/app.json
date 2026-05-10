@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "LivenessCamera Example",
-    "slug": "react-native-liveness-camera-example",
+    "name": "Liveness Example",
+    "slug": "react-native-liveness-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

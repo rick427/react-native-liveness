@@ -1,5 +1,5 @@
 {
-  "name": "react-native-liveness-camera-example",
+  "name": "react-native-liveness-example",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -7,7 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "build:ios": "xcodebuild ONLY_ACTIVE_ARCH=YES -workspace ios/LivenessCameraExample.xcworkspace -UseNewBuildSystem=YES -scheme LivenessCameraExample -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build -quiet",
+    "build:ios": "xcodebuild ONLY_ACTIVE_ARCH=YES -workspace ios/LivenessExample.xcworkspace -UseNewBuildSystem=YES -scheme LivenessExample -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build -quiet",
     "build:android": "cd android && ./gradlew assembleDebug -DtestBuildType=debug -Dorg.gradle.jvmargs=-Xmx4g",
     "build:web": "expo export --platform web"
   },

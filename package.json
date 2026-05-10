@@ -1,12 +1,12 @@
 {
-  "name": "react-native-liveness-camera",
+  "name": "react-native-liveness",
   "version": "0.1.0",
   "description": "Liveness detection library for React Native using Vision Camera v4 and ML Kit",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
     ".": {
-      "source": "./src/index.tsx",
+      "source": "./src/index.ts",
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },
@@ -17,7 +17,6 @@
     "lib",
     "android",
     "ios",
-    "cpp",
     "*.podspec",
     "react-native.config.js",
     "!ios/build",
@@ -41,18 +40,23 @@
   "keywords": [
     "react-native",
     "ios",
-    "android"
+    "android",
+    "liveness",
+    "face-detection",
+    "vision-camera",
+    "mlkit",
+    "biometrics"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com.git"
+    "url": "git+https://github.com/rick427/react-native-liveness.git"
   },
-  "author": "Richard <rchardnjoku@yahoo.com> (https://github.com)",
+  "author": "Richard <rchardnjoku@yahoo.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/issues"
+    "url": "https://github.com/rick427/react-native-liveness/issues"
   },
-  "homepage": "https://github.com#readme",
+  "homepage": "https://github.com/rick427/react-native-liveness#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -62,22 +66,36 @@
     "@eslint/js": "^10.0.1",
     "@react-native/babel-preset": "0.85.0",
     "@react-native/eslint-config": "0.85.0",
+    "@shopify/react-native-skia": "^1.5.0",
     "@types/react": "^19.2.0",
     "del-cli": "^7.0.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-ft-flow": "^3.0.11",
     "eslint-plugin-prettier": "^5.5.5",
     "prettier": "^3.8.1",
     "react": "19.2.0",
     "react-native": "0.83.6",
     "react-native-builder-bob": "^0.41.0",
+    "react-native-reanimated": "^4.3.0",
+    "react-native-sound": "^0.11.2",
+    "react-native-vision-camera": "^4.0.0",
+    "react-native-worklets-core": "^1.3.3",
     "turbo": "^2.8.21",
     "typescript": "^6.0.2"
   },
   "peerDependencies": {
+    "@shopify/react-native-skia": ">=1.0.0",
     "react": "*",
-    "react-native": "*"
+    "react-native": "*",
+    "react-native-reanimated": ">=4.3.0",
+    "react-native-sound": ">=0.11.0",
+    "react-native-vision-camera": ">=4.0.0",
+    "react-native-worklets-core": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native-sound": {
+      "optional": true
+    }
   },
   "workspaces": [
     "example"
@@ -101,27 +119,11 @@
       ]
     ]
   },
-  "codegenConfig": {
-    "name": "LivenessCameraSpec",
-    "type": "modules",
-    "jsSrcsDir": "src",
-    "android": {
-      "javaPackageName": "com.livenesscamera"
-    }
-  },
   "prettier": {
     "quoteProps": "consistent",
     "singleQuote": true,
     "tabWidth": 2,
     "trailingComma": "es5",
     "useTabs": false
-  },
-  "create-react-native-library": {
-    "type": "turbo-module",
-    "languages": "kotlin-objc",
-    "tools": [
-      "eslint"
-    ],
-    "version": "0.62.0"
   }
 }

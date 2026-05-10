@@ -10,11 +10,17 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => min_ios_version_supported }
-  s.source       = { :git => "https://github.com.git", :tag => "#{s.version}" }
+  s.platforms    = { :ios => "13.0" }
+  s.source       = { :git => "https://github.com/rick427/react-native-liveness.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm,swift,cpp}"
-  s.private_header_files = "ios/**/*.h"
+  s.source_files = "ios/**/*.{h,m,mm,swift}"
+  s.swift_version = "5.7"
+
+  # Vision Camera frame processor plugin
+  s.dependency "VisionCamera"
+
+  # ML Kit Face Detection
+  s.dependency "GoogleMLKit/FaceDetection", "~> 7.0"
 
   install_modules_dependencies(s)
 end

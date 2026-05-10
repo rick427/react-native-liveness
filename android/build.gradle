@@ -10,7 +10,6 @@ buildscript {
     if (rootProject.ext.has(prop)) {
       return rootProject.ext.get(prop)
     }
-
     return LivenessCamera[prop]
   }
 
@@ -21,20 +20,16 @@ buildscript {
 
   dependencies {
     classpath "com.android.tools.build:gradle:8.7.2"
-    // noinspection DifferentKotlinGradleVersion
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
   }
 }
 
-
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
-
 apply plugin: "com.facebook.react"
 
 android {
   namespace "com.livenesscamera"
-
   compileSdkVersion getExtOrDefault("compileSdkVersion")
 
   defaultConfig {
@@ -60,8 +55,26 @@ android {
     sourceCompatibility JavaVersion.VERSION_1_8
     targetCompatibility JavaVersion.VERSION_1_8
   }
+
+  kotlinOptions {
+    jvmTarget = "1.8"
+  }
+}
+
+repositories {
+  google()
+  mavenCentral()
 }
 
 dependencies {
   implementation "com.facebook.react:react-android"
+
+  // Vision Camera
+  implementation "com.mrousavy.camera:react-native-vision-camera:+"
+
+  // ML Kit Face Detection
+  implementation "com.google.mlkit:face-detection:16.1.7"
+
+  // Google Play Services Tasks (for Tasks.await() synchronous execution)
+  implementation "com.google.android.gms:play-services-tasks:18.1.0"
 }

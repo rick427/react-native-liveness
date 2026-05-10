@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "react-native-liveness-camera": ["./src/index"]
+      "react-native-liveness": ["./src/index"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
