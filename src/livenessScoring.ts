@@ -1,10 +1,12 @@
 import type { FaceData, FeedbackMessage } from './types';
 
+// Eye openness is intentionally excluded — passive liveness detection does not
+// require gestures. Natural blinks are involuntary and must never penalise the
+// user. Liveness is confirmed via face presence, size, and frontal pose only.
 const WEIGHTS = {
-  faceDetected: 0.2,
-  faceSize: 0.2,
-  headPose: 0.3,
-  eyesOpen: 0.3,
+  faceDetected: 0.25,
+  faceSize: 0.3,
+  headPose: 0.45,
 } as const;
 
 // Loosened from 0.20 / 0.65 — gives more room for the user to breathe
@@ -63,20 +65,12 @@ export function scoreFrame(face: FaceData, frameWidth: number): FrameScore {
         );
   const headPose = (yawScore + pitchScore) / 2;
 
-  // ML Kit returns -1 when classification is disabled or unavailable
-  const leftEye =
-    face.leftEyeOpenProbability >= 0 ? face.leftEyeOpenProbability : 0.5;
-  const rightEye =
-    face.rightEyeOpenProbability >= 0 ? face.rightEyeOpenProbability : 0.5;
-  const eyesOpen = (leftEye + rightEye) / 2;
-
   const total =
     WEIGHTS.faceDetected * 1.0 +
     WEIGHTS.faceSize * faceSize +
-    WEIGHTS.headPose * headPose +
-    WEIGHTS.eyesOpen * eyesOpen;
+    WEIGHTS.headPose * headPose;
 
-  return { total, faceSize, headPose, eyesOpen };
+  return { total, faceSize, headPose, eyesOpen: 0 };
 }
 
 export function rollingAverage(scores: number[]): number {
@@ -99,12 +93,6 @@ export function getFeedback(
   const yawBad = Math.abs(face.yawAngle) >= MAX_YAW_DEG;
   const pitchBad = Math.abs(face.pitchAngle) >= MAX_PITCH_DEG;
   if (yawBad || pitchBad) return 'Look straight ahead';
-
-  const leftEye =
-    face.leftEyeOpenProbability >= 0 ? face.leftEyeOpenProbability : 1;
-  const rightEye =
-    face.rightEyeOpenProbability >= 0 ? face.rightEyeOpenProbability : 1;
-  if (leftEye < 0.4 || rightEye < 0.4) return 'Open your eyes';
 
   return 'Hold still...';
 }

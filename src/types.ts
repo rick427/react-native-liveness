@@ -33,7 +33,6 @@ export type FeedbackMessage =
   | 'Look straight ahead'
   | 'Hold still...'
   | 'Stay still'
-  | 'Open your eyes'
   | 'Liveness confirmed'
   | '';
 
@@ -65,13 +64,15 @@ export type LivenessCameraProps = {
   countdownFrom?: number;
 
   /**
-   * Score (0–1) required to confirm liveness. Defaults to 0.75.
+   * Per-frame score (0–1) a frame must reach to count as a good frame.
+   * Defaults to 0.65. Scored on face presence, size, and head pose only —
+   * eye openness is not used (passive detection, no gestures required).
    */
   livenessThreshold?: number;
 
   /**
-   * Number of consecutive high-score frames required before liveness is
-   * confirmed. Defaults to 10 (~500ms at 20fps).
+   * Number of consecutive good frames required to confirm liveness.
+   * Defaults to 7 (~350ms at 20fps).
    */
   confirmFrames?: number;
 

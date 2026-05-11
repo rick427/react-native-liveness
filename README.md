@@ -226,16 +226,17 @@ The circle guide layers three animations built entirely with `Animated` + `react
 
 ## How liveness scoring works
 
-Each camera frame is scored across four signals at up to **20 fps** (ML Kit is throttled via `runAtTargetFps` while the preview renders at 60 fps):
+Each camera frame is scored across three signals at up to **20 fps** (ML Kit is throttled via `runAtTargetFps` while the preview renders at 60 fps):
 
 | Signal | Weight | Detail |
 |---|---|---|
-| Face detected | 20% | ML Kit found a face in the frame. |
-| Face size | 20% | Face width is 15–80% of the frame. Soft-edge scoring at boundaries. |
-| Head pose | 30% | Yaw < ±25° and pitch < ±25° from frontal. Soft decay outside range. |
-| Eyes open | 30% | Average of left/right eye open probability from ML Kit. |
+| Face detected | 25% | ML Kit found a face in the frame. |
+| Face size | 30% | Face width is 15–80% of the frame. Soft-edge scoring at boundaries. |
+| Head pose | 45% | Yaw < ±25° and pitch < ±25° from frontal. Soft decay outside range. |
 
-A rolling window of the last 20 frame scores is maintained. Liveness is confirmed once `confirmFrames` consecutive frames all score above `livenessThreshold`. Bad frames **decay** the streak by 2 instead of resetting it, making detection resilient to momentary noise.
+Eye openness is intentionally excluded — this is **passive** liveness detection. Natural blinks are involuntary and must not penalise the user.
+
+Liveness is confirmed once `confirmFrames` consecutive frames all score above `livenessThreshold`. Bad frames decay the streak by 1 instead of resetting it, making detection resilient to momentary noise.
 
 ---
 
