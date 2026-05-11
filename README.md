@@ -1,5 +1,11 @@
 # @rick427/react-native-liveness
 
+[![npm version](https://img.shields.io/npm/v/@rick427/react-native-liveness?style=flat-square&color=brightgreen)](https://www.npmjs.com/package/@rick427/react-native-liveness)
+[![npm downloads](https://img.shields.io/npm/dm/@rick427/react-native-liveness?style=flat-square&color=blue)](https://www.npmjs.com/package/@rick427/react-native-liveness)
+[![CI](https://img.shields.io/github/actions/workflow/status/rick427/react-native-liveness/ci.yml?style=flat-square&label=CI)](https://github.com/rick427/react-native-liveness/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)](./LICENSE)
+[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-lightgrey?style=flat-square)](https://github.com/rick427/react-native-liveness)
+
 A React Native library for real-time **liveness detection** using the device's front camera. Powered by [Vision Camera v4](https://github.com/mrousavy/react-native-vision-camera) and **ML Kit Face Detection** — no server required, fully on-device.
 
 The library scores each camera frame against a set of liveness signals (face size, head pose, eye openness), confirms liveness after a sustained high-score window, then automatically counts down **3 → 2 → 1**, plays a shutter sound, and captures the photo.
