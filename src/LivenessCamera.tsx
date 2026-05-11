@@ -3,6 +3,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import {
   Camera,
   useCameraDevice,
+  useCameraFormat,
   useCameraPermission,
 } from 'react-native-vision-camera';
 import { Circle, Path, Svg } from 'react-native-svg';
@@ -151,6 +152,10 @@ export function LivenessCamera({
 }: LivenessCameraProps) {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
+  // Pick the best format that supports up to 60 fps. Falls back gracefully
+  // to whatever the device offers if 60 fps isn't available.
+  const format = useCameraFormat(device, [{ fps: 60 }]);
+  const fps = Math.min(format?.maxFps ?? 30, 60);
   const cameraRef = useRef<Camera>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
@@ -208,7 +213,8 @@ export function LivenessCamera({
         frameProcessor={frameProcessor}
         photo
         pixelFormat="yuv"
-        fps={60}
+        format={format}
+        fps={fps}
       />
       <CircleOverlay
         width={containerSize.width}

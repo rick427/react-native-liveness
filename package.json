@@ -1,6 +1,6 @@
 {
   "name": "@rick427/react-native-liveness",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Liveness detection library for React Native using Vision Camera v4 and ML Kit",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
