@@ -16,10 +16,13 @@ The library scores each camera frame against a set of liveness signals (face siz
 
 - Real-time passive liveness detection (no gestures required)
 - On-device ML — works fully offline (ML Kit)
-- Face guide oval with live feedback hints
-- Animated countdown (React Native built-in `Animated`)
+- Circle guide with animated scanner — sweeping scan line, rotating corner brackets, confidence progress arc
+- Score-driven border colour: white → yellow → green
+- Built-in modal via `LivenessCameraModal` — one import, zero wiring
+- Configurable animation type, close button style, and font
 - Auto photo capture via Vision Camera's `takePhoto()`
-- Optional shutter sound
+- 60 fps preview, ML Kit capped at 20 fps via `runAtTargetFps`
+- Optional shutter sound (respects silent mode)
 - Fully typed TypeScript API
 
 ---
@@ -48,7 +51,7 @@ npm install react-native-vision-camera react-native-svg react-native-worklets-co
 
 ### Configure worklets Babel plugin
 
-The library uses Vision Camera frame processors which run in a worklet context. Add the appropriate plugin to your `babel.config.js` depending on which package you have installed:
+The library uses Vision Camera frame processors which run in a worklet context. Add the appropriate plugin to your `babel.config.js`:
 
 ```js
 // babel.config.js
@@ -63,7 +66,7 @@ module.exports = {
 
 > **Already have worklets configured?** Just confirm the relevant plugin line is present — no further changes needed.
 
-After updating the Babel config, clear the Metro cache:
+After updating Babel config, clear the Metro cache:
 
 ```sh
 npx react-native start --reset-cache
@@ -86,13 +89,75 @@ Add `NSCameraUsageDescription` to your `Info.plist`:
 
 ### Android
 
-The ML Kit dependency is included in `build.gradle` automatically. No extra steps needed.
+ML Kit and all native dependencies are included automatically via `build.gradle`. No extra steps needed.
 
 ---
 
 ## Usage
 
-### Drop-in component
+There are two ways to use the library depending on how much control you need.
+
+---
+
+### Option 1 — `LivenessCameraModal` (recommended)
+
+The easiest integration. Pass `visible` / `onClose` and you're done — the modal, close button, and full-screen layout are all handled for you.
+
+```tsx
+import { useState } from 'react';
+import { LivenessCameraModal } from '@rick427/react-native-liveness';
+import type { CaptureResult } from '@rick427/react-native-liveness';
+
+export default function VerificationScreen() {
+  const [showLiveness, setShowLiveness] = useState(false);
+
+  const handleCapture = (result: CaptureResult) => {
+    console.log('Photo path:', result.photo.path);
+    console.log('Liveness score:', result.livenessScore); // 0.0 – 1.0
+    setShowLiveness(false);
+  };
+
+  return (
+    <>
+      {/* Trigger however you like */}
+      <Button title="Verify Identity" onPress={() => setShowLiveness(true)} />
+
+      <LivenessCameraModal
+        visible={showLiveness}
+        onClose={() => setShowLiveness(false)}
+        onCapture={handleCapture}
+        onLivenessConfirmed={() => console.log('Live face confirmed!')}
+        onError={(err) => console.error(err)}
+      />
+    </>
+  );
+}
+```
+
+#### `LivenessCameraModal` props
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `visible` | `boolean` | **required** | Controls modal visibility. |
+| `onClose` | `() => void` | **required** | Called when the × button is pressed or Android back is fired. |
+| `onCapture` | `(result: CaptureResult) => void` | **required** | Fired after photo is captured. |
+| `animationType` | `'slide' \| 'fade' \| 'none'` | `'slide'` | Modal entrance/exit animation. |
+| `closeButtonStyle` | `ViewStyle` | — | Override the close button container style (position, size, colours). |
+| `closeButtonIconColor` | `string` | `'#fff'` | Colour of the × icon. |
+| `closeButtonIconSize` | `number` | `18` | Size of the × icon in dp. |
+| `onLivenessConfirmed` | `() => void` | — | Fired the moment liveness is confirmed, before countdown. |
+| `onError` | `(err: Error) => void` | — | Fired on unrecoverable errors. |
+| `countdownFrom` | `number` | `3` | Countdown start value. |
+| `livenessThreshold` | `number` | `0.75` | Score (0–1) required to confirm liveness. |
+| `confirmFrames` | `number` | `10` | Consecutive high-score frames required (~500 ms at 20 fps). |
+| `soundEnabled` | `boolean` | `true` | Play native shutter sound on capture. |
+| `fontFamily` | `string` | `'Baloo-Medium'` | Font applied to all text inside the component. |
+
+---
+
+### Option 2 — `LivenessCamera` (embedded)
+
+Use this when you want full layout control — embed the camera directly inside your own screen or custom modal.
 
 ```tsx
 import { LivenessCamera } from '@rick427/react-native-liveness';
@@ -101,7 +166,7 @@ import type { CaptureResult } from '@rick427/react-native-liveness';
 export default function VerificationScreen() {
   const handleCapture = (result: CaptureResult) => {
     console.log('Photo path:', result.photo.path);
-    console.log('Liveness score:', result.livenessScore); // 0.0 – 1.0
+    console.log('Liveness score:', result.livenessScore);
   };
 
   return (
@@ -115,20 +180,23 @@ export default function VerificationScreen() {
 }
 ```
 
-### Props
+#### `LivenessCamera` props
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `onCapture` | `(result: CaptureResult) => void` | **required** | Fired after photo is taken. |
-| `onLivenessConfirmed` | `() => void` | — | Fired the moment liveness is confirmed, before the countdown. |
+| `onCapture` | `(result: CaptureResult) => void` | **required** | Fired after photo is captured. |
+| `onLivenessConfirmed` | `() => void` | — | Fired the moment liveness is confirmed, before countdown. |
 | `onError` | `(err: Error) => void` | — | Fired on unrecoverable errors. |
 | `countdownFrom` | `number` | `3` | Countdown start value. |
-| `livenessThreshold` | `number` | `0.75` | Score (0–1) required per frame to be considered live. |
-| `confirmFrames` | `number` | `15` | Consecutive high-score frames required (~500 ms at 30 fps). |
-| `soundEnabled` | `boolean` | `true` | Play the native system shutter sound on capture. Respects silent mode. |
+| `livenessThreshold` | `number` | `0.75` | Score (0–1) required to confirm liveness. |
+| `confirmFrames` | `number` | `10` | Consecutive high-score frames required (~500 ms at 20 fps). |
+| `soundEnabled` | `boolean` | `true` | Play native shutter sound on capture. |
+| `fontFamily` | `string` | `'Baloo-Medium'` | Font applied to all text inside the component. |
 | `style` | `ViewStyle` | — | Style for the root container. |
 
-### CaptureResult
+---
+
+### `CaptureResult`
 
 ```ts
 type CaptureResult = {
@@ -140,34 +208,48 @@ type CaptureResult = {
 
 ---
 
+## Scanner animation
+
+The circle guide layers three animations built entirely with `Animated` + `react-native-svg` — no extra dependencies.
+
+| Layer | Behaviour |
+|---|---|
+| **Dim base ring** | Always visible; gives a positioning target before any progress starts. |
+| **Sweep scan line** | A gradient bar ping-pongs top → bottom inside the circle (1.8 s/leg). Fades out on confirm. |
+| **Rotating brackets** | Four corner arcs rotate slowly (1 rev / 6 s), suggesting the circle boundary during scanning. Freeze in place on confirm. |
+| **Progress arc** | The circle border draws itself in clockwise from 12 o'clock as `livenessScore / livenessThreshold` builds. White → yellow → green. |
+
+---
+
 ## How liveness scoring works
 
-Each camera frame is scored across four signals:
+Each camera frame is scored across four signals at up to **20 fps** (ML Kit is throttled via `runAtTargetFps` while the preview renders at 60 fps):
 
 | Signal | Weight | Detail |
 |---|---|---|
-| Face detected | 20% | ML Kit found a face in the frame |
-| Face size | 20% | Face width is 20%–65% of the frame (not too far, not too close) |
-| Head pose | 30% | Yaw < ±20° and pitch < ±20° from frontal |
-| Eyes open | 30% | Average of left/right eye open probability from ML Kit |
+| Face detected | 20% | ML Kit found a face in the frame. |
+| Face size | 20% | Face width is 15–80% of the frame. Soft-edge scoring at boundaries. |
+| Head pose | 30% | Yaw < ±25° and pitch < ±25° from frontal. Soft decay outside range. |
+| Eyes open | 30% | Average of left/right eye open probability from ML Kit. |
 
-A rolling window of the last 20 frame scores is maintained. Liveness is confirmed once `confirmFrames` consecutive frames all score above `livenessThreshold`.
+A rolling window of the last 20 frame scores is maintained. Liveness is confirmed once `confirmFrames` consecutive frames all score above `livenessThreshold`. Bad frames **decay** the streak by 2 instead of resetting it, making detection resilient to momentary noise.
 
 ---
 
 ## Architecture
 
 ```
-Camera frame (30fps)
+Camera (60 fps preview)
   ↓  [worklet thread — Vision Camera frame processor]
-Native plugin (Swift / Kotlin)
-  → ML Kit Face Detection
-  → { bounds, yawAngle, pitchAngle, leftEyeOpenProbability, … }
-  ↓  [runOnJS → JS thread]
+  runAtTargetFps(20) → Native plugin (Swift / Kotlin)
+    → ML Kit Face Detection
+    → { bounds, yawAngle, pitchAngle, leftEyeOpenProbability, … }
+  ↓  [Worklets.createRunOnJS → JS thread, ~20×/sec]
 useLivenessCamera hook
-  → scoreFrame() per frame
+  → scoreFrame() — soft-edge signals, weighted sum
   → rolling 20-frame window
-  → 15 consecutive frames > threshold → liveness confirmed
+  → consecutiveGood++ on pass, decay -2 on fail
+  → 10 consecutive frames > threshold → liveness confirmed
   ↓
 Countdown 3 → 2 → 1  (React Native Animated)
   ↓
