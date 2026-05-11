@@ -10,6 +10,8 @@ import { Circle, Path, Svg } from 'react-native-svg';
 import { useLivenessCamera } from './useLivenessCamera';
 import type { LivenessCameraProps, LivenessState } from './types';
 
+const DEFAULT_FONT = 'Baloo-Medium';
+
 // Circle diameter = 82 % of container width — large enough to fit any face
 // comfortably without the user needing to fiddle with distance.
 const CIRCLE_DIAMETER_RATIO = 0.82;
@@ -69,13 +71,10 @@ function CircleOverlay({
   if (width === 0 || height === 0) return null;
 
   const cx = width / 2;
-  // Centre the circle slightly above midpoint so the face sits naturally
   const cy = height * 0.42;
   const r = (width * CIRCLE_DIAMETER_RATIO) / 2;
   const color = getCircleColor(state, score);
 
-  // Compound path: full-screen rect + circle cutout.
-  // evenodd fill rule makes the circle area transparent.
   const scrimD = `M0 0H${width}V${height}H0Z ${circlePath(cx, cy, r)}`;
 
   return (
@@ -93,9 +92,13 @@ function CircleOverlay({
   );
 }
 
-function CountdownBubble({ value }: { value: number }) {
-  // key={countdown} in the parent remounts this component on every tick,
-  // so [] deps are correct — each mount runs a fresh animation.
+function CountdownBubble({
+  value,
+  fontFamily,
+}: {
+  value: number;
+  fontFamily: string;
+}) {
   const scale = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -135,7 +138,7 @@ function CountdownBubble({ value }: { value: number }) {
     <Animated.View
       style={[styles.countdownBubble, { opacity, transform: [{ scale }] }]}
     >
-      <Text style={styles.countdownText}>{value}</Text>
+      <Text style={[styles.countdownText, { fontFamily }]}>{value}</Text>
     </Animated.View>
   );
 }
@@ -148,12 +151,11 @@ export function LivenessCamera({
   livenessThreshold = 0.75,
   confirmFrames = 10,
   soundEnabled = true,
+  fontFamily = DEFAULT_FONT,
   style,
 }: LivenessCameraProps) {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
-  // Pick the best format that supports up to 60 fps. Falls back gracefully
-  // to whatever the device offers if 60 fps isn't available.
   const format = useCameraFormat(device, [{ fps: 60 }]);
   const fps = Math.min(format?.maxFps ?? 30, 60);
   const cameraRef = useRef<Camera>(null);
@@ -190,7 +192,9 @@ export function LivenessCamera({
   if (!hasPermission) {
     return (
       <View style={[styles.root, style, styles.centered]}>
-        <Text style={styles.permissionText}>Camera permission required</Text>
+        <Text style={[styles.permissionText, { fontFamily }]}>
+          Camera permission required
+        </Text>
       </View>
     );
   }
@@ -198,7 +202,9 @@ export function LivenessCamera({
   if (!device) {
     return (
       <View style={[styles.root, style, styles.centered]}>
-        <Text style={styles.permissionText}>No front camera found</Text>
+        <Text style={[styles.permissionText, { fontFamily }]}>
+          No front camera found
+        </Text>
       </View>
     );
   }
@@ -224,12 +230,16 @@ export function LivenessCamera({
       />
       {livenessState !== 'done' && (
         <View style={styles.feedbackContainer}>
-          <Text style={styles.feedbackText}>{feedback}</Text>
+          <Text style={[styles.feedbackText, { fontFamily }]}>{feedback}</Text>
         </View>
       )}
       {livenessState === 'countdown' && countdown !== null && (
         <View style={styles.countdownContainer}>
-          <CountdownBubble key={countdown} value={countdown} />
+          <CountdownBubble
+            key={countdown}
+            value={countdown}
+            fontFamily={fontFamily}
+          />
         </View>
       )}
       {livenessState === 'capturing' && (
@@ -266,7 +276,6 @@ const styles = StyleSheet.create({
   feedbackText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.8)',
     textShadowOffset: { width: 0, height: 1 },
@@ -290,7 +299,6 @@ const styles = StyleSheet.create({
   countdownText: {
     color: '#fff',
     fontSize: 52,
-    fontWeight: '700',
     lineHeight: 60,
   },
   captureFlash: {

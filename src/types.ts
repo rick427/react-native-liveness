@@ -1,4 +1,4 @@
-import type { ViewStyle } from 'react-native';
+import type { ModalProps, ViewStyle } from 'react-native';
 import type { PhotoFile } from 'react-native-vision-camera';
 
 export type FaceData = {
@@ -81,8 +81,47 @@ export type LivenessCameraProps = {
   style?: ViewStyle;
 
   /**
-   * Whether to play a shutter sound on capture. Requires react-native-sound
-   * to be installed. Defaults to true.
+   * Whether to play a shutter sound on capture. Defaults to true.
    */
   soundEnabled?: boolean;
+
+  /**
+   * Font family applied to all text inside the component.
+   * Defaults to 'Baloo-Medium'. Set to undefined to use the system font.
+   */
+  fontFamily?: string;
+};
+
+export type LivenessCameraModalProps = Omit<LivenessCameraProps, 'style'> & {
+  /**
+   * Controls modal visibility — pass your own boolean state.
+   */
+  visible: boolean;
+
+  /**
+   * Called when the close button is pressed or the Android back button fires.
+   * Use this to set your visible state to false.
+   */
+  onClose: () => void;
+
+  /**
+   * Modal entrance/exit animation. Defaults to 'slide'.
+   */
+  animationType?: ModalProps['animationType'];
+
+  /**
+   * Override styles on the close button container.
+   * Useful for adjusting position or size to match your design system.
+   */
+  closeButtonStyle?: ViewStyle;
+
+  /**
+   * Colour of the × icon inside the close button. Defaults to '#fff'.
+   */
+  closeButtonIconColor?: string;
+
+  /**
+   * Size of the × icon in dp. Defaults to 18.
+   */
+  closeButtonIconSize?: number;
 };
