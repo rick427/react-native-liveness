@@ -53,8 +53,8 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Liveness Check</Text>
       <Text style={styles.subtitle}>
-        Face the front camera. The library will detect liveness, count down,
-        and auto-capture.
+        Face the front camera. The library will detect liveness, count down, and
+        auto-capture.
       </Text>
 
       {result ? (

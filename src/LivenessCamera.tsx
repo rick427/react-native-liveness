@@ -72,7 +72,12 @@ function OvalOverlay({
     <Canvas style={StyleSheet.absoluteFill}>
       <Path path={path} color="rgba(0,0,0,0.55)" />
       <Group>
-        <Path path={ovalPath} style="stroke" strokeWidth={STROKE_WIDTH} color={color} />
+        <Path
+          path={ovalPath}
+          style="stroke"
+          strokeWidth={STROKE_WIDTH}
+          color={color}
+        />
         {showDot && (
           <Circle cx={cx} cy={cy - ry - 8} r={5} color={color}>
             <Paint color={color} />

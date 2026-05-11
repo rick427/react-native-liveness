@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { runOnJS, useFrameProcessor } from 'react-native-worklets-core';
-import type { Camera } from 'react-native-vision-camera';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Camera, Frame } from 'react-native-vision-camera';
+import { useFrameProcessor } from 'react-native-vision-camera';
+import { Worklets } from 'react-native-worklets-core';
 import { useLivenessPlugin } from './LivenessDetector';
 import { getFeedback, rollingAverage, scoreFrame } from './livenessScoring';
 import type {
@@ -72,7 +73,6 @@ export function useLivenessCamera(options: Options) {
       // react-native-sound is an optional peer dep — require lazily.
       // Consumer must add shutter.mp3 to their app's main bundle
       // (iOS: drag into Xcode; Android: android/app/src/main/res/raw/shutter.mp3).
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Sound =
         require('react-native-sound').default ?? require('react-native-sound');
       Sound.setCategory('Playback');
@@ -197,13 +197,18 @@ export function useLivenessCamera(options: Options) {
 
   // ─── Frame processor ──────────────────────────────────────────────────────
 
+  const handleFaceDataJS = useMemo(
+    () => Worklets.createRunOnJS(handleFaceData),
+    [handleFaceData]
+  );
+
   const frameProcessor = useFrameProcessor(
-    (frame) => {
+    (frame: Frame) => {
       'worklet';
       const face = plugin.detectLiveness(frame);
-      runOnJS(handleFaceData)(face, frame.width);
+      handleFaceDataJS(face, frame.width);
     },
-    [plugin, handleFaceData]
+    [plugin, handleFaceDataJS]
   );
 
   useEffect(() => {

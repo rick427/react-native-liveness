@@ -7,7 +7,10 @@ type LivenessPlugin = {
 };
 
 function createPlugin(): LivenessPlugin {
-  const plugin = VisionCameraProxy.initFrameProcessorPlugin('detectLiveness', {});
+  const plugin = VisionCameraProxy.initFrameProcessorPlugin(
+    'detectLiveness',
+    {}
+  );
 
   if (!plugin) {
     throw new Error(
