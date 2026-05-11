@@ -210,6 +210,7 @@ export function LivenessCamera({
         frameProcessor={frameProcessor}
         photo
         pixelFormat="yuv"
+        fps={60}
       />
       <OvalOverlay
         width={containerSize.width}

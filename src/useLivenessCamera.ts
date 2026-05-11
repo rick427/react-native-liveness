@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Camera, Frame } from 'react-native-vision-camera';
-import { useFrameProcessor } from 'react-native-vision-camera';
+import { runAtTargetFps, useFrameProcessor } from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import { useLivenessPlugin } from './LivenessDetector';
 import { getFeedback, rollingAverage, scoreFrame } from './livenessScoring';
@@ -182,8 +182,13 @@ export function useLivenessCamera(options: Options) {
   const frameProcessor = useFrameProcessor(
     (frame: Frame) => {
       'worklet';
-      const face = plugin.detectLiveness(frame);
-      handleFaceDataJS(face, frame.width);
+      // Camera preview renders at full fps (60). ML Kit only needs ~20fps —
+      // running it on every frame would block the render thread unnecessarily.
+      runAtTargetFps(20, () => {
+        'worklet';
+        const face = plugin.detectLiveness(frame);
+        handleFaceDataJS(face, frame.width);
+      });
     },
     [plugin, handleFaceDataJS]
   );
