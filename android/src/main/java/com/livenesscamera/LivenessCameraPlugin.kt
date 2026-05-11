@@ -7,12 +7,10 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
-import com.mrousavy.camera.frameprocessors.VisionCameraProxyHolder
 
-class LivenessCameraPlugin(
-  proxy: VisionCameraProxyHolder,
-  options: Map<String, Any>?
-) : FrameProcessorPlugin(proxy, options) {
+// Vision Camera v4.5+ removed VisionCameraProxyHolder and made FrameProcessorPlugin
+// a no-arg constructor. The proxy/options are no longer passed at construction time.
+class LivenessCameraPlugin : FrameProcessorPlugin() {
 
   private val faceDetector = FaceDetection.getClient(
     FaceDetectorOptions.Builder()
@@ -23,15 +21,28 @@ class LivenessCameraPlugin(
       .build()
   )
 
+  /**
+   * Convert Vision Camera's Orientation to ML Kit rotation degrees.
+   * Uses toString() comparison to stay resilient across VC patch versions
+   * where the Orientation API (toDegrees / toSurfaceRotation) may vary.
+   */
+  private fun orientationDegrees(frame: Frame): Int {
+    val name = frame.orientation.toString().uppercase()
+    return when {
+      name.contains("LANDSCAPE_LEFT") -> 90
+      name.contains("PORTRAIT_UPSIDE_DOWN") -> 180
+      name.contains("LANDSCAPE_RIGHT") -> 270
+      else -> 0 // PORTRAIT
+    }
+  }
+
   override fun callback(frame: Frame, arguments: Map<String, Any>?): Any {
     val mediaImage: Image = frame.image
-    val rotationDegrees = frame.orientation.toDegrees()
-
-    val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
+    val inputImage = InputImage.fromMediaImage(mediaImage, orientationDegrees(frame))
 
     return try {
       // Tasks.await blocks the frame-processor thread synchronously.
-      // ML Kit face detection is fast (~5-10ms) so this is acceptable.
+      // ML Kit face detection is fast (~5–10 ms) so this is acceptable.
       val faces = Tasks.await(faceDetector.process(inputImage))
 
       if (faces.isEmpty()) {

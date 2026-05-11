@@ -12,8 +12,9 @@ class LivenessCameraPackage : ReactPackage {
     init {
       // Register the frame processor plugin under the name "detectLiveness".
       // JS side calls VisionCameraProxy.initFrameProcessorPlugin('detectLiveness').
-      FrameProcessorPluginRegistry.addFrameProcessorPlugin("detectLiveness") { proxy, options ->
-        LivenessCameraPlugin(proxy, options)
+      // Lambda ignores proxy/options — FrameProcessorPlugin is no-arg in VC v4.5+.
+      FrameProcessorPluginRegistry.addFrameProcessorPlugin("detectLiveness") { _, _ ->
+        LivenessCameraPlugin()
       }
     }
   }
