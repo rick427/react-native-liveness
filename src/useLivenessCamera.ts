@@ -3,7 +3,7 @@ import type { Camera, Frame } from 'react-native-vision-camera';
 import { runAtTargetFps, useFrameProcessor } from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import { useLivenessPlugin } from './LivenessDetector';
-import { getFeedback, rollingAverage, scoreFrame } from './livenessScoring';
+import { CHALLENGE_STEPS } from './livenessScoring';
 import type {
   CaptureResult,
   FaceData,
@@ -11,14 +11,9 @@ import type {
   LivenessState,
 } from './types';
 
-const WINDOW_SIZE = 20;
-// How many frames to decay consecutiveGood by on a bad frame.
-// 1 means a single noisy/blink frame only undoes one good frame.
-const CONSECUTIVE_DECAY = 1;
+const TOTAL_STEPS = CHALLENGE_STEPS.length;
 
 type Options = {
-  livenessThreshold: number;
-  confirmFrames: number;
   countdownFrom: number;
   soundEnabled: boolean;
   cameraRef: React.RefObject<Camera | null>;
@@ -29,6 +24,7 @@ type Options = {
 
 type LivenessCameraState = {
   livenessState: LivenessState;
+  /** Challenge progress 0–1. Drives the arc. */
   livenessScore: number;
   countdown: number | null;
   feedback: FeedbackMessage;
@@ -36,8 +32,6 @@ type LivenessCameraState = {
 
 export function useLivenessCamera(options: Options) {
   const {
-    livenessThreshold,
-    confirmFrames,
     countdownFrom,
     soundEnabled,
     cameraRef,
@@ -48,27 +42,17 @@ export function useLivenessCamera(options: Options) {
 
   const plugin = useLivenessPlugin();
 
-  // Mutable refs — updated every frame, never cause re-renders
-  const frameScores = useRef<number[]>([]);
-  const consecutiveGood = useRef(0);
-  const frameWidth = useRef(0);
+  // ── Step machine refs — mutated every frame, never cause re-renders ────────
+  const currentStepIdx = useRef(0);
+  const stepFrameCount = useRef(0);
   const stateRef = useRef<LivenessState>('scanning');
   const isCaptured = useRef(false);
-
-  // Feedback debouncing: only update the displayed text after the same message
-  // has been stable for FEEDBACK_DEBOUNCE_MS. Prevents rapid flickering when
-  // ML Kit oscillates between two states on consecutive frames.
-  const FEEDBACK_DEBOUNCE_MS = 400;
-  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingFeedback = useRef<FeedbackMessage>(
-    'Position your face in the circle'
-  );
 
   const [state, setState] = useState<LivenessCameraState>({
     livenessState: 'scanning',
     livenessScore: 0,
     countdown: null,
-    feedback: 'Position your face in the circle',
+    feedback: CHALLENGE_STEPS[0]!.instruction,
   });
 
   const setLivenessState = useCallback((next: LivenessState) => {
@@ -76,37 +60,29 @@ export function useLivenessCamera(options: Options) {
     setState((prev) => ({ ...prev, livenessState: next }));
   }, []);
 
-  // ─── Capture ──────────────────────────────────────────────────────────────
-
+  // ── Capture ────────────────────────────────────────────────────────────────
   const capture = useCallback(async () => {
     if (isCaptured.current || !cameraRef.current) return;
     isCaptured.current = true;
-
     setLivenessState('capturing');
-
     try {
       const photo = await cameraRef.current.takePhoto({
         flash: 'off',
         enableShutterSound: soundEnabled,
       });
-      const score = rollingAverage(frameScores.current);
-
       setLivenessState('done');
-      onCapture({ photo, livenessScore: score, timestamp: Date.now() });
+      onCapture({ photo, livenessScore: 1, timestamp: Date.now() });
     } catch (err) {
       setLivenessState('error');
       onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   }, [cameraRef, onCapture, onError, soundEnabled, setLivenessState]);
 
-  // ─── Countdown ────────────────────────────────────────────────────────────
-
+  // ── Countdown ──────────────────────────────────────────────────────────────
   const startCountdown = useCallback(() => {
     setLivenessState('countdown');
     let tick = countdownFrom;
-
     setState((prev) => ({ ...prev, countdown: tick }));
-
     const interval = setInterval(() => {
       tick -= 1;
       if (tick <= 0) {
@@ -117,23 +93,21 @@ export function useLivenessCamera(options: Options) {
         setState((prev) => ({ ...prev, countdown: tick }));
       }
     }, 1000);
-
     return () => clearInterval(interval);
   }, [capture, countdownFrom, setLivenessState]);
 
-  // ─── Per-frame face handler (runs on JS thread, called from worklet) ──────
-
+  // ── Per-frame face handler (runs on JS thread, called from worklet) ────────
   const handleFaceData = useCallback(
     (face: FaceData | null, width: number) => {
+      const s = stateRef.current;
       if (
-        stateRef.current === 'capturing' ||
-        stateRef.current === 'done' ||
-        stateRef.current === 'error'
-      ) {
+        s === 'confirmed' ||
+        s === 'countdown' ||
+        s === 'capturing' ||
+        s === 'done' ||
+        s === 'error'
+      )
         return;
-      }
-
-      frameWidth.current = width;
 
       const safeFace: FaceData = face ?? {
         detected: false,
@@ -146,65 +120,54 @@ export function useLivenessCamera(options: Options) {
         smilingProbability: -1,
       };
 
-      const { total } = scoreFrame(safeFace, width);
+      const step = CHALLENGE_STEPS[currentStepIdx.current]!;
+      const stepMet = step.check(safeFace, width);
 
-      frameScores.current.push(total);
-      if (frameScores.current.length > WINDOW_SIZE) {
-        frameScores.current.shift();
-      }
-
-      const avgScore = rollingAverage(frameScores.current);
-
-      // Decay on bad frames instead of hard reset — one noisy ML Kit result
-      // won't wipe out progress the user has already built up.
-      if (total >= livenessThreshold) {
-        consecutiveGood.current += 1;
+      // Advance or gently decay the frame counter
+      if (stepMet) {
+        stepFrameCount.current += 1;
       } else {
-        consecutiveGood.current = Math.max(
-          0,
-          consecutiveGood.current - CONSECUTIVE_DECAY
-        );
+        stepFrameCount.current = Math.max(0, stepFrameCount.current - 1);
       }
 
-      // Consecutive-frames gate only. The avgScore is displayed on the arc but
-      // not used as a confirmation gate — the rolling window starts empty so
-      // early frames (before the face was positioned) drag the average down and
-      // would prevent confirmation even when the face is clearly live.
-      const isLive = consecutiveGood.current >= confirmFrames;
+      // Step complete?
+      if (stepFrameCount.current >= step.framesRequired) {
+        stepFrameCount.current = 0;
+        const nextIdx = currentStepIdx.current + 1;
 
-      // Debounce the feedback text: only apply a new message after it has been
-      // stable for FEEDBACK_DEBOUNCE_MS, preventing rapid label flickering.
-      const newFeedback = getFeedback(safeFace, width, isLive);
-      if (newFeedback !== pendingFeedback.current) {
-        pendingFeedback.current = newFeedback;
-        if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
-        feedbackTimer.current = setTimeout(() => {
+        if (nextIdx >= TOTAL_STEPS) {
+          // All challenges done — confirm liveness
           setState((prev) => ({
             ...prev,
-            feedback: pendingFeedback.current,
+            livenessScore: 1,
+            feedback: 'Liveness confirmed',
           }));
-        }, FEEDBACK_DEBOUNCE_MS);
+          setLivenessState('confirmed');
+          onLivenessConfirmed?.();
+          startCountdown();
+        } else {
+          // Advance to next challenge
+          currentStepIdx.current = nextIdx;
+          setState((prev) => ({
+            ...prev,
+            livenessScore: nextIdx / TOTAL_STEPS,
+            feedback: CHALLENGE_STEPS[nextIdx]!.instruction,
+          }));
+        }
+        return;
       }
 
-      setState((prev) => ({ ...prev, livenessScore: avgScore }));
-
-      if (isLive && stateRef.current === 'scanning') {
-        setLivenessState('confirmed');
-        onLivenessConfirmed?.();
-        startCountdown();
-      }
+      // Smooth arc progress within the current step
+      const progress =
+        (currentStepIdx.current +
+          stepFrameCount.current / step.framesRequired) /
+        TOTAL_STEPS;
+      setState((prev) => ({ ...prev, livenessScore: progress }));
     },
-    [
-      confirmFrames,
-      livenessThreshold,
-      onLivenessConfirmed,
-      setLivenessState,
-      startCountdown,
-    ]
+    [onLivenessConfirmed, setLivenessState, startCountdown]
   );
 
-  // ─── Frame processor ──────────────────────────────────────────────────────
-
+  // ── Frame processor ────────────────────────────────────────────────────────
   const handleFaceDataJS = useMemo(
     () => Worklets.createRunOnJS(handleFaceData),
     [handleFaceData]
@@ -213,8 +176,6 @@ export function useLivenessCamera(options: Options) {
   const frameProcessor = useFrameProcessor(
     (frame: Frame) => {
       'worklet';
-      // Camera preview renders at full fps (60). ML Kit only needs ~20fps —
-      // running it on every frame would block the render thread unnecessarily.
       runAtTargetFps(20, () => {
         'worklet';
         const face = plugin.detectLiveness(frame);
@@ -226,10 +187,9 @@ export function useLivenessCamera(options: Options) {
 
   useEffect(() => {
     return () => {
-      frameScores.current = [];
-      consecutiveGood.current = 0;
+      currentStepIdx.current = 0;
+      stepFrameCount.current = 0;
       isCaptured.current = false;
-      if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
     };
   }, []);
 

@@ -28,16 +28,15 @@ export type LivenessState =
 
 export type FeedbackMessage =
   | 'Position your face in the circle'
-  | 'Move closer'
-  | 'Move farther away'
-  | 'Look straight ahead'
-  | 'Hold still...'
-  | 'Stay still'
+  | 'Turn your head slightly'
+  | 'Now look straight ahead'
+  | 'Now blink'
   | 'Liveness confirmed'
   | '';
 
 export type CaptureResult = {
   photo: PhotoFile;
+  /** Always 1.0 — all challenges were passed before capture. */
   livenessScore: number;
   timestamp: number;
 };
@@ -62,19 +61,6 @@ export type LivenessCameraProps = {
    * Countdown start value. Defaults to 3.
    */
   countdownFrom?: number;
-
-  /**
-   * Per-frame score (0–1) a frame must reach to count as a good frame.
-   * Defaults to 0.65. Scored on face presence, size, and head pose only —
-   * eye openness is not used (passive detection, no gestures required).
-   */
-  livenessThreshold?: number;
-
-  /**
-   * Number of consecutive good frames required to confirm liveness.
-   * Defaults to 7 (~350ms at 20fps).
-   */
-  confirmFrames?: number;
 
   /**
    * Style applied to the root container.

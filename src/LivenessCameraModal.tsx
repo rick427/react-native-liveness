@@ -49,8 +49,6 @@ export function LivenessCameraModal({
   onLivenessConfirmed,
   onError,
   countdownFrom,
-  livenessThreshold,
-  confirmFrames,
   soundEnabled,
   fontFamily,
 }: LivenessCameraModalProps) {
@@ -73,8 +71,6 @@ export function LivenessCameraModal({
           onLivenessConfirmed={onLivenessConfirmed}
           onError={onError}
           countdownFrom={countdownFrom}
-          livenessThreshold={livenessThreshold}
-          confirmFrames={confirmFrames}
           soundEnabled={soundEnabled}
           fontFamily={fontFamily}
         />

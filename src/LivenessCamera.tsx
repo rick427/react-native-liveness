@@ -47,9 +47,9 @@ const BRACKET_STROKE = STROKE_WIDTH + 1;
 
 // ─── Colour helper ────────────────────────────────────────────────────────────
 /**
- *  ● White  – no face / scanning (score < 0.4)
- *  ● Yellow – face detected, confidence building
- *  ● Green  – liveness confirmed / countdown / capture
+ *  ● White  – no face yet (arc at 0)
+ *  ● Yellow – challenge in progress (arc filling)
+ *  ● Green  – all challenges passed (confirmed / countdown / capture)
  *  ● Red    – error
  */
 function getCircleColor(state: LivenessState, score: number): string {
@@ -62,7 +62,7 @@ function getCircleColor(state: LivenessState, score: number): string {
     case 'done':
       return '#4CAF50';
     default:
-      return score >= 0.4 ? '#FFD60A' : '#FFFFFF';
+      return score > 0.02 ? '#FFD60A' : '#FFFFFF';
   }
 }
 
@@ -103,13 +103,11 @@ function CircleOverlay({
   height,
   state,
   score,
-  livenessThreshold,
 }: {
   width: number;
   height: number;
   state: LivenessState;
   score: number;
-  livenessThreshold: number;
 }) {
   // ── Shared values — all hooks before any early return ─────────────────────
   // scanProgress 0=top 1=bottom, ping-pongs continuously
@@ -147,13 +145,12 @@ function CircleOverlay({
     [cx, cy]
   );
 
+  // score is already 0–1 challenge progress — arc fills directly
   const progressAnimProps = useAnimatedProps(
     () => ({
-      strokeDashoffset:
-        circumference -
-        (livenessProgress.value / livenessThreshold) * circumference,
+      strokeDashoffset: circumference * (1 - livenessProgress.value),
     }),
-    [circumference, livenessThreshold]
+    [circumference]
   );
 
   // ── Start scan line + bracket rotation on mount ───────────────────────────
@@ -186,12 +183,10 @@ function CircleOverlay({
     }
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Drive progress arc from live score ────────────────────────────────────
+  // ── Drive progress arc from challenge progress (0–1) ─────────────────────
   useEffect(() => {
-    livenessProgress.value = withTiming(Math.min(score, livenessThreshold), {
-      duration: 180,
-    });
-  }, [score, livenessThreshold]); // eslint-disable-line react-hooks/exhaustive-deps
+    livenessProgress.value = withTiming(score, { duration: 220 });
+  }, [score]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Guard — render nothing until dimensions are known ─────────────────────
   if (width === 0 || height === 0) return null;
@@ -334,8 +329,6 @@ export function LivenessCamera({
   onLivenessConfirmed,
   onError,
   countdownFrom = 3,
-  livenessThreshold = 0.65,
-  confirmFrames = 7,
   soundEnabled = true,
   fontFamily = DEFAULT_FONT,
   style,
@@ -349,8 +342,6 @@ export function LivenessCamera({
 
   const { frameProcessor, livenessState, livenessScore, countdown, feedback } =
     useLivenessCamera({
-      livenessThreshold,
-      confirmFrames,
       countdownFrom,
       soundEnabled,
       cameraRef,
@@ -413,7 +404,6 @@ export function LivenessCamera({
         height={containerSize.height}
         state={livenessState}
         score={livenessScore}
-        livenessThreshold={livenessThreshold}
       />
       {livenessState !== 'done' && (
         <View style={styles.feedbackContainer}>

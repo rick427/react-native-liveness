@@ -151,8 +151,6 @@ export default function VerificationScreen() {
 | `onLivenessConfirmed` | `() => void` | — | Fired the moment liveness is confirmed, before countdown. |
 | `onError` | `(err: Error) => void` | — | Fired on unrecoverable errors. |
 | `countdownFrom` | `number` | `3` | Countdown start value. |
-| `livenessThreshold` | `number` | `0.65` | Per-frame score (0–1) required to count as a good frame. |
-| `confirmFrames` | `number` | `7` | Consecutive good frames required to confirm liveness (~350 ms at 20 fps). |
 | `soundEnabled` | `boolean` | `true` | Play native shutter sound on capture. |
 | `fontFamily` | `string` | `'Baloo-Medium'` | Font applied to all text inside the component. |
 
@@ -191,8 +189,6 @@ export default function VerificationScreen() {
 | `onLivenessConfirmed` | `() => void` | — | Fired the moment liveness is confirmed, before countdown. |
 | `onError` | `(err: Error) => void` | — | Fired on unrecoverable errors. |
 | `countdownFrom` | `number` | `3` | Countdown start value. |
-| `livenessThreshold` | `number` | `0.65` | Per-frame score (0–1) required to count as a good frame. |
-| `confirmFrames` | `number` | `7` | Consecutive good frames required to confirm liveness (~350 ms at 20 fps). |
 | `soundEnabled` | `boolean` | `true` | Play native shutter sound on capture. |
 | `fontFamily` | `string` | `'Baloo-Medium'` | Font applied to all text inside the component. |
 | `style` | `ViewStyle` | — | Style for the root container. |
@@ -224,19 +220,16 @@ The circle guide layers three animations built entirely with `Animated` + `react
 
 ---
 
-## How liveness scoring works
+## How liveness detection works
 
-Each camera frame is scored across three signals at up to **20 fps** (ML Kit is throttled via `runAtTargetFps` while the preview renders at 60 fps):
+Detection runs at up to **20 fps** via ML Kit (preview renders at 60 fps). The user is guided through four sequential challenges. Each challenge must be held for a short window of consecutive frames before the arc advances. The arc fills yellow as challenges complete, then snaps green when all four pass and the countdown begins.
 
-| Signal | Weight | Detail |
+| Step | Challenge | Condition |
 |---|---|---|
-| Face detected | 25% | ML Kit found a face in the frame. |
-| Face size | 30% | Face width is 15–80% of the frame. Soft-edge scoring at boundaries. |
-| Head pose | 45% | Yaw < ±25° and pitch < ±25° from frontal. Soft decay outside range. |
-
-Eye openness is intentionally excluded — this is **passive** liveness detection. Natural blinks are involuntary and must not penalise the user.
-
-Liveness is confirmed once `confirmFrames` consecutive frames all score above `livenessThreshold`. Bad frames decay the streak by 1 instead of resetting it, making detection resilient to momentary noise.
+| 1 | Position your face in the circle | Face detected, correct size, looking roughly forward |
+| 2 | Turn your head slightly | Yaw > 15° either direction |
+| 3 | Now look straight ahead | Yaw < 10°, pitch < 15° |
+| 4 | Now blink | Both eye-open probabilities drop below 0.3 |
 
 ---
 
