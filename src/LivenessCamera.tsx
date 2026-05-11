@@ -32,12 +32,7 @@ function getOvalColor(state: LivenessState): string {
  * cubic bezier curves. Used inside a compound path with fillRule="evenodd"
  * to punch a transparent hole through the dark scrim.
  */
-function ellipsePath(
-  cx: number,
-  cy: number,
-  rx: number,
-  ry: number
-): string {
+function ellipsePath(cx: number, cy: number, rx: number, ry: number): string {
   return [
     `M ${cx + rx} ${cy}`,
     `C ${cx + rx} ${cy - ry * K} ${cx + rx * K} ${cy - ry} ${cx} ${cy - ry}`,
