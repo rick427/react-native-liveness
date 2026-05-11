@@ -49,7 +49,6 @@ export function useLivenessCamera(options: Options) {
   const frameScores = useRef<number[]>([]);
   const consecutiveGood = useRef(0);
   const frameWidth = useRef(0);
-  const latestFace = useRef<FaceData | null>(null);
   const stateRef = useRef<LivenessState>('scanning');
   const isCaptured = useRef(false);
 
@@ -65,29 +64,6 @@ export function useLivenessCamera(options: Options) {
     setState((prev) => ({ ...prev, livenessState: next }));
   }, []);
 
-  // ─── Sound ────────────────────────────────────────────────────────────────
-
-  const playShutter = useCallback(() => {
-    if (!soundEnabled) return;
-    try {
-      // react-native-sound is an optional peer dep — require lazily.
-      // Consumer must add shutter.mp3 to their app's main bundle
-      // (iOS: drag into Xcode; Android: android/app/src/main/res/raw/shutter.mp3).
-      const Sound =
-        require('react-native-sound').default ?? require('react-native-sound');
-      Sound.setCategory('Playback');
-      const sound = new Sound(
-        'shutter.mp3',
-        Sound.MAIN_BUNDLE,
-        (err: Error | null) => {
-          if (!err) sound.play(() => sound.release());
-        }
-      );
-    } catch {
-      // react-native-sound not installed or sound file missing — silently skip
-    }
-  }, [soundEnabled]);
-
   // ─── Capture ──────────────────────────────────────────────────────────────
 
   const capture = useCallback(async () => {
@@ -95,10 +71,12 @@ export function useLivenessCamera(options: Options) {
     isCaptured.current = true;
 
     setLivenessState('capturing');
-    playShutter();
 
     try {
-      const photo = await cameraRef.current.takePhoto({ flash: 'off' });
+      const photo = await cameraRef.current.takePhoto({
+        flash: 'off',
+        enableShutterSound: soundEnabled,
+      });
       const score = rollingAverage(frameScores.current);
 
       setLivenessState('done');
@@ -107,7 +85,7 @@ export function useLivenessCamera(options: Options) {
       setLivenessState('error');
       onError?.(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [cameraRef, onCapture, onError, playShutter, setLivenessState]);
+  }, [cameraRef, onCapture, onError, soundEnabled, setLivenessState]);
 
   // ─── Countdown ────────────────────────────────────────────────────────────
 
@@ -144,7 +122,6 @@ export function useLivenessCamera(options: Options) {
       }
 
       frameWidth.current = width;
-      latestFace.current = face;
 
       const safeFace: FaceData = face ?? {
         detected: false,

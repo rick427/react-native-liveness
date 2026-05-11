@@ -22,17 +22,14 @@ The library scores each camera frame against a set of liveness signals (face siz
 
 Install and link these peer dependencies in your project before using `react-native-liveness`:
 
-| Package | Version | Notes |
-|---|---|---|
-| `react-native-vision-camera` | `>= 4.0.0` | Required |
-| `react-native-worklets-core` | `>= 1.0.0` | Required (also needed by Vision Camera) |
-| `react-native-svg` | `>= 13.0.0` | Required |
-| `react-native-sound` | `>= 0.11.0` | Optional — for shutter sound |
+| Package | Version |
+|---|---|
+| `react-native-vision-camera` | `>= 4.0.0` |
+| `react-native-worklets-core` | `>= 1.0.0` |
+| `react-native-svg` | `>= 13.0.0` |
 
 ```sh
 npm install react-native-vision-camera react-native-worklets-core react-native-svg
-# or
-yarn add react-native-vision-camera react-native-worklets-core react-native-svg
 ```
 
 ---
@@ -49,6 +46,7 @@ Then install the peer dependencies if you haven't already:
 
 ```sh
 npm install react-native-vision-camera react-native-worklets-core react-native-svg
+cd ios && pod install
 ```
 
 ### iOS
@@ -69,15 +67,6 @@ Add `NSCameraUsageDescription` to your `Info.plist`:
 ### Android
 
 The ML Kit dependency is included in `build.gradle` automatically. No extra steps needed.
-
-### Shutter sound (optional)
-
-If you have `react-native-sound` installed and want the camera-click sound on capture:
-
-- **iOS** — drag `shutter.mp3` into your Xcode project (make sure *Copy items if needed* and the correct target are checked).
-- **Android** — place `shutter.mp3` at `android/app/src/main/res/raw/shutter.mp3`.
-
-If the file is missing, sound is silently skipped — nothing breaks.
 
 ---
 
@@ -116,7 +105,7 @@ export default function VerificationScreen() {
 | `countdownFrom` | `number` | `3` | Countdown start value. |
 | `livenessThreshold` | `number` | `0.75` | Score (0–1) required per frame to be considered live. |
 | `confirmFrames` | `number` | `15` | Consecutive high-score frames required (~500 ms at 30 fps). |
-| `soundEnabled` | `boolean` | `true` | Play shutter sound on capture (requires `react-native-sound`). |
+| `soundEnabled` | `boolean` | `true` | Play the native system shutter sound on capture. Respects silent mode. |
 | `style` | `ViewStyle` | — | Style for the root container. |
 
 ### CaptureResult
