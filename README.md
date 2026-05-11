@@ -57,15 +57,17 @@ The library uses Vision Camera frame processors which run in a worklet context. 
 ```js
 // babel.config.js
 module.exports = {
-  presets: ['module:@react-native/babel-preset'], // or 'babel-preset-expo'
+  presets: [
+    'module:@react-native/babel-preset', // or 'babel-preset-expo'
+  ],
   plugins: [
-    'react-native-worklets-core/plugin', // frame processor worklets
-    'react-native-reanimated/plugin',    // SVG animations (must come last)
+    'react-native-worklets-core/plugin', // Vision Camera frame processors
+    'react-native-worklets/plugin',      // Reanimated v4 SVG animations
   ],
 };
 ```
 
-> **Already have both plugins?** Just confirm both lines are present — order matters, Reanimated must come after worklets-core.
+> **Already have the plugins?** Just confirm both lines are present in `plugins` (not inside `presets`). `react-native-worklets/plugin` is installed as part of `react-native-worklets` which is a peer dependency of `react-native-reanimated`.
 
 After updating Babel config, clear the Metro cache:
 
