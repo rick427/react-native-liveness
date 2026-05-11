@@ -13,8 +13,8 @@ import type {
 
 const WINDOW_SIZE = 20;
 // How many frames to decay consecutiveGood by on a bad frame.
-// Decay (not hard reset) means one noisy frame won't erase all progress.
-const CONSECUTIVE_DECAY = 2;
+// 1 means a single noisy/blink frame only undoes one good frame.
+const CONSECUTIVE_DECAY = 1;
 
 type Options = {
   livenessThreshold: number;
@@ -166,9 +166,11 @@ export function useLivenessCamera(options: Options) {
         );
       }
 
-      const isLive =
-        consecutiveGood.current >= confirmFrames &&
-        avgScore >= livenessThreshold;
+      // Consecutive-frames gate only. The avgScore is displayed on the arc but
+      // not used as a confirmation gate — the rolling window starts empty so
+      // early frames (before the face was positioned) drag the average down and
+      // would prevent confirmation even when the face is clearly live.
+      const isLive = consecutiveGood.current >= confirmFrames;
 
       // Debounce the feedback text: only apply a new message after it has been
       // stable for FEEDBACK_DEBOUNCE_MS, preventing rapid label flickering.

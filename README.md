@@ -151,8 +151,8 @@ export default function VerificationScreen() {
 | `onLivenessConfirmed` | `() => void` | — | Fired the moment liveness is confirmed, before countdown. |
 | `onError` | `(err: Error) => void` | — | Fired on unrecoverable errors. |
 | `countdownFrom` | `number` | `3` | Countdown start value. |
-| `livenessThreshold` | `number` | `0.75` | Score (0–1) required to confirm liveness. |
-| `confirmFrames` | `number` | `10` | Consecutive high-score frames required (~500 ms at 20 fps). |
+| `livenessThreshold` | `number` | `0.65` | Per-frame score (0–1) required to count as a good frame. |
+| `confirmFrames` | `number` | `7` | Consecutive good frames required to confirm liveness (~350 ms at 20 fps). |
 | `soundEnabled` | `boolean` | `true` | Play native shutter sound on capture. |
 | `fontFamily` | `string` | `'Baloo-Medium'` | Font applied to all text inside the component. |
 
@@ -191,8 +191,8 @@ export default function VerificationScreen() {
 | `onLivenessConfirmed` | `() => void` | — | Fired the moment liveness is confirmed, before countdown. |
 | `onError` | `(err: Error) => void` | — | Fired on unrecoverable errors. |
 | `countdownFrom` | `number` | `3` | Countdown start value. |
-| `livenessThreshold` | `number` | `0.75` | Score (0–1) required to confirm liveness. |
-| `confirmFrames` | `number` | `10` | Consecutive high-score frames required (~500 ms at 20 fps). |
+| `livenessThreshold` | `number` | `0.65` | Per-frame score (0–1) required to count as a good frame. |
+| `confirmFrames` | `number` | `7` | Consecutive good frames required to confirm liveness (~350 ms at 20 fps). |
 | `soundEnabled` | `boolean` | `true` | Play native shutter sound on capture. |
 | `fontFamily` | `string` | `'Baloo-Medium'` | Font applied to all text inside the component. |
 | `style` | `ViewStyle` | — | Style for the root container. |
