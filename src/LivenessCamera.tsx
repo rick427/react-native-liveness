@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated as RNAnimated, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   Camera,
   useCameraDevice,
@@ -20,8 +29,9 @@ import {
 import { useLivenessCamera } from './useLivenessCamera';
 import type { LivenessCameraProps, LivenessState } from './types';
 
-// ─── Animated SVG components ─────────────────────────────────────────────────
-// Created once at module level so React never recreates the component class.
+// ─── Animated SVG components (Reanimated) ────────────────────────────────────
+// createAnimatedComponent from react-native-reanimated properly drives SVG
+// presentation attributes (strokeDashoffset, y, rotation) on the UI thread.
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedG = Animated.createAnimatedComponent(G);
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -101,107 +111,93 @@ function CircleOverlay({
   score: number;
   livenessThreshold: number;
 }) {
-  // ── Animation values (must be declared before any early return) ────────────
-  const scanAnim = useRef(new Animated.Value(0)).current;
-  const scanOpacity = useRef(new Animated.Value(1)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  const bracketAnim = useRef(new Animated.Value(0)).current;
+  // ── Shared values — all hooks before any early return ─────────────────────
+  // scanProgress 0=top 1=bottom, ping-pongs continuously
+  const scanProgress = useSharedValue(0);
+  const scanOpacity = useSharedValue(1);
+  // bracketRot drives the slow bracket rotation in degrees
+  const bracketRot = useSharedValue(0);
+  // livenessProgress tracks smoothed score for the arc
+  const livenessProgress = useSharedValue(0);
 
-  const scanLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const bracketLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  // ── Start scan line + bracket rotation on mount ───────────────────────────
-  useEffect(() => {
-    // Scan line: ping-pong top → bottom → top, 1.8 s each leg
-    scanLoopRef.current = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scanAnim, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }),
-        Animated.timing(scanAnim, {
-          toValue: 0,
-          duration: 1800,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    scanLoopRef.current.start();
-
-    // Brackets: one full rotation every 6 s — slow, atmospheric
-    bracketLoopRef.current = Animated.loop(
-      Animated.timing(bracketAnim, {
-        toValue: 360,
-        duration: 6000,
-        easing: Easing.linear,
-        useNativeDriver: false,
-      })
-    );
-    bracketLoopRef.current.start();
-
-    return () => {
-      scanLoopRef.current?.stop();
-      bracketLoopRef.current?.stop();
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── On confirmed: stop scan + brackets, fade out scan line ────────────────
-  useEffect(() => {
-    const isActive = state === 'scanning';
-    if (!isActive) {
-      scanLoopRef.current?.stop();
-      bracketLoopRef.current?.stop();
-      Animated.timing(scanOpacity, {
-        toValue: 0,
-        duration: 350,
-        useNativeDriver: false,
-      }).start();
-    }
-  }, [state, scanOpacity]);
-
-  // ── Drive progress arc from live score ────────────────────────────────────
-  useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: Math.min(score, livenessThreshold),
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
-  }, [score, livenessThreshold, progressAnim]);
-
-  // ── Guard — render nothing until dimensions are known ─────────────────────
-  if (width === 0 || height === 0) return null;
-
-  // ── Geometry ──────────────────────────────────────────────────────────────
+  // ── Geometry — computed before useAnimatedProps (safe when 0) ─────────────
   const cx = width / 2;
   const cy = height * 0.42;
   const r = (width * CIRCLE_DIAMETER_RATIO) / 2;
   const circumference = 2 * Math.PI * r;
   const color = getCircleColor(state, score);
 
-  // Scrim: full-screen dark rect with transparent circle hole
+  // ── Animated props — UI-thread worklets, deps rebuilt when geometry changes
+  const scanAnimProps = useAnimatedProps(
+    () => ({
+      // Map 0→1 progress onto the pixel range inside the circle
+      y: cy - r + 2 + scanProgress.value * (2 * r - SCAN_LINE_HEIGHT - 4),
+      opacity: scanOpacity.value,
+    }),
+    [cy, r]
+  );
+
+  const bracketAnimProps = useAnimatedProps(
+    () => ({
+      // react-native-svg accepts numeric rotation + origin instead of a string
+      rotation: bracketRot.value % 360,
+      originX: cx,
+      originY: cy,
+    }),
+    [cx, cy]
+  );
+
+  const progressAnimProps = useAnimatedProps(
+    () => ({
+      strokeDashoffset:
+        circumference -
+        (livenessProgress.value / livenessThreshold) * circumference,
+    }),
+    [circumference, livenessThreshold]
+  );
+
+  // ── Start scan line + bracket rotation on mount ───────────────────────────
+  useEffect(() => {
+    scanProgress.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1800, easing: Easing.linear }),
+        withTiming(0, { duration: 1800, easing: Easing.linear })
+      ),
+      -1,
+      false
+    );
+    bracketRot.value = withRepeat(
+      withTiming(360, { duration: 6000, easing: Easing.linear }),
+      -1,
+      false
+    );
+    return () => {
+      cancelAnimation(scanProgress);
+      cancelAnimation(bracketRot);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── On liveness confirmed: freeze brackets, fade scan line out ────────────
+  useEffect(() => {
+    if (state !== 'scanning') {
+      cancelAnimation(scanProgress);
+      cancelAnimation(bracketRot);
+      scanOpacity.value = withTiming(0, { duration: 350 });
+    }
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Drive progress arc from live score ────────────────────────────────────
+  useEffect(() => {
+    livenessProgress.value = withTiming(Math.min(score, livenessThreshold), {
+      duration: 180,
+    });
+  }, [score, livenessThreshold]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Guard — render nothing until dimensions are known ─────────────────────
+  if (width === 0 || height === 0) return null;
+
+  // Scrim: full-screen rect with transparent circle cutout (evenodd rule)
   const scrimD = `M0 0H${width}V${height}H0Z ${circlePath(cx, cy, r)}`;
-
-  // Scan line Y: sweeps from just inside top to just inside bottom of circle
-  const scanLineY = scanAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [cy - r + 2, cy + r - SCAN_LINE_HEIGHT - 2],
-  });
-
-  // Progress arc: strokeDashoffset goes from full (no arc) → 0 (full arc)
-  const strokeDashoffset = progressAnim.interpolate({
-    inputRange: [0, livenessThreshold],
-    outputRange: [circumference, 0],
-    extrapolate: 'clamp',
-  });
-
-  // Bracket group rotation — centred on the circle
-  const bracketTransform = bracketAnim.interpolate({
-    inputRange: [0, 360],
-    outputRange: [`rotate(0, ${cx}, ${cy})`, `rotate(360, ${cx}, ${cy})`],
-  });
 
   // 4 corner brackets at NE / SE / SW / NW diagonal positions
   const bracketD = [45, 135, 225, 315]
@@ -243,16 +239,15 @@ function CircleOverlay({
       <G clipPath="url(#liveness-circle-clip)">
         <AnimatedRect
           x={cx - r}
-          y={scanLineY}
           width={r * 2}
           height={SCAN_LINE_HEIGHT}
           fill="url(#scan-gradient)"
-          opacity={scanOpacity}
+          animatedProps={scanAnimProps}
         />
       </G>
 
       {/* ── Rotating corner brackets ─────────────────────────────────────── */}
-      <AnimatedG transform={bracketTransform}>
+      <AnimatedG animatedProps={bracketAnimProps}>
         <Path
           d={bracketD}
           fill="none"
@@ -264,7 +259,7 @@ function CircleOverlay({
       </AnimatedG>
 
       {/* ── Progress arc — draws in as liveness confidence builds ────────── */}
-      {/* Rotated -90° so it starts at 12 o'clock and goes clockwise */}
+      {/* transform rotates -90° so arc starts at 12 o'clock, goes clockwise */}
       <AnimatedCircle
         cx={cx}
         cy={cy}
@@ -273,9 +268,9 @@ function CircleOverlay({
         stroke={color}
         strokeWidth={STROKE_WIDTH}
         strokeDasharray={circumference}
-        strokeDashoffset={strokeDashoffset}
         strokeLinecap="round"
         transform={`rotate(-90, ${cx}, ${cy})`}
+        animatedProps={progressAnimProps}
       />
     </Svg>
   );
@@ -289,26 +284,26 @@ function CountdownBubble({
   value: number;
   fontFamily: string;
 }) {
-  const scale = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new RNAnimated.Value(0)).current;
+  const opacity = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.sequence([
-        Animated.spring(scale, {
+    RNAnimated.parallel([
+      RNAnimated.sequence([
+        RNAnimated.spring(scale, {
           toValue: 1.2,
           stiffness: 200,
           damping: 6,
           useNativeDriver: true,
         }),
-        Animated.spring(scale, {
+        RNAnimated.spring(scale, {
           toValue: 1.0,
           stiffness: 150,
           damping: 8,
           useNativeDriver: true,
         }),
       ]),
-      Animated.timing(opacity, {
+      RNAnimated.timing(opacity, {
         toValue: 1,
         duration: 150,
         useNativeDriver: true,
@@ -316,7 +311,7 @@ function CountdownBubble({
     ]).start();
 
     return () => {
-      Animated.timing(opacity, {
+      RNAnimated.timing(opacity, {
         toValue: 0,
         duration: 200,
         useNativeDriver: true,
@@ -325,11 +320,11 @@ function CountdownBubble({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Animated.View
+    <RNAnimated.View
       style={[styles.countdownBubble, { opacity, transform: [{ scale }] }]}
     >
       <Text style={[styles.countdownText, { fontFamily }]}>{value}</Text>
-    </Animated.View>
+    </RNAnimated.View>
   );
 }
 

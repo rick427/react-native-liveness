@@ -44,9 +44,10 @@ Install these if you don't already have them:
 | `react-native-vision-camera` | `>= 4.0.0` |
 | `react-native-svg` | `>= 13.0.0` |
 | `react-native-worklets-core` | `>= 1.0.0` |
+| `react-native-reanimated` | `>= 4.0.0` |
 
 ```sh
-npm install react-native-vision-camera react-native-svg react-native-worklets-core
+npm install react-native-vision-camera react-native-svg react-native-worklets-core react-native-reanimated
 ```
 
 ### Configure worklets Babel plugin
@@ -58,13 +59,13 @@ The library uses Vision Camera frame processors which run in a worklet context. 
 module.exports = {
   presets: ['module:@react-native/babel-preset'], // or 'babel-preset-expo'
   plugins: [
-    ['react-native-worklets-core/plugin'], // if using react-native-worklets-core
-    // ['react-native-worklets/plugin'],   // if using react-native-worklets
+    'react-native-worklets-core/plugin', // frame processor worklets
+    'react-native-reanimated/plugin',    // SVG animations (must come last)
   ],
 };
 ```
 
-> **Already have worklets configured?** Just confirm the relevant plugin line is present — no further changes needed.
+> **Already have both plugins?** Just confirm both lines are present — order matters, Reanimated must come after worklets-core.
 
 After updating Babel config, clear the Metro cache:
 
