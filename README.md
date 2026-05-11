@@ -11,7 +11,7 @@ The library scores each camera frame against a set of liveness signals (face siz
 - Real-time passive liveness detection (no gestures required)
 - On-device ML — works fully offline (ML Kit)
 - Face guide oval with live feedback hints
-- Animated countdown with Reanimated v4
+- Animated countdown (React Native built-in `Animated`)
 - Auto photo capture via Vision Camera's `takePhoto()`
 - Optional shutter sound
 - Fully typed TypeScript API
@@ -22,13 +22,18 @@ The library scores each camera frame against a set of liveness signals (face siz
 
 Install and link these peer dependencies in your project before using `react-native-liveness`:
 
-| Package | Version |
-|---|---|
-| `react-native-vision-camera` | `>= 4.0.0` |
-| `react-native-worklets-core` | `>= 1.0.0` |
-| `@shopify/react-native-skia` | `>= 1.0.0` |
-| `react-native-reanimated` | `>= 4.3.0` |
-| `react-native-sound` | `>= 0.11.0` *(optional — for shutter sound)* |
+| Package | Version | Notes |
+|---|---|---|
+| `react-native-vision-camera` | `>= 4.0.0` | Required |
+| `react-native-worklets-core` | `>= 1.0.0` | Required (also needed by Vision Camera) |
+| `react-native-svg` | `>= 13.0.0` | Required |
+| `react-native-sound` | `>= 0.11.0` | Optional — for shutter sound |
+
+```sh
+npm install react-native-vision-camera react-native-worklets-core react-native-svg
+# or
+yarn add react-native-vision-camera react-native-worklets-core react-native-svg
+```
 
 ---
 
@@ -38,6 +43,12 @@ Install and link these peer dependencies in your project before using `react-nat
 npm install react-native-liveness
 # or
 yarn add react-native-liveness
+```
+
+Then install the peer dependencies if you haven't already:
+
+```sh
+npm install react-native-vision-camera react-native-worklets-core react-native-svg
 ```
 
 ### iOS
@@ -149,7 +160,7 @@ useLivenessCamera hook
   → rolling 20-frame window
   → 15 consecutive frames > threshold → liveness confirmed
   ↓
-Countdown 3 → 2 → 1  (Reanimated v4)
+Countdown 3 → 2 → 1  (React Native Animated)
   ↓
 camera.takePhoto() → onCapture({ photo, livenessScore, timestamp })
 ```
