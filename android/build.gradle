@@ -69,8 +69,9 @@ repositories {
 dependencies {
   implementation "com.facebook.react:react-android"
 
-  // Vision Camera
-  implementation "com.mrousavy.camera:react-native-vision-camera:+"
+  // Vision Camera — resolved from the consumer's node_modules via auto-linking,
+  // not from Maven. compileOnly = available at compile time, provided at runtime.
+  compileOnly project(':react-native-vision-camera')
 
   // ML Kit Face Detection
   implementation "com.google.mlkit:face-detection:16.1.7"
