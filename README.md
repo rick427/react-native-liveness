@@ -40,21 +40,22 @@ Install these if you don't already have them:
 npm install react-native-vision-camera react-native-svg react-native-worklets-core
 ```
 
-### Configure react-native-worklets-core
+### Configure worklets Babel plugin
 
-The library uses Vision Camera frame processors which run in a worklet context. You must add the worklets-core Babel plugin to your `babel.config.js`:
+The library uses Vision Camera frame processors which run in a worklet context. Add the appropriate plugin to your `babel.config.js` depending on which package you have installed:
 
 ```js
 // babel.config.js
 module.exports = {
   presets: ['module:@react-native/babel-preset'], // or 'babel-preset-expo'
   plugins: [
-    'react-native-worklets-core/plugin', // ← add this
+    ['react-native-worklets-core/plugin'], // if using react-native-worklets-core
+    // ['react-native-worklets/plugin'],   // if using react-native-worklets
   ],
 };
 ```
 
-> **Already using `react-native-worklets-core`?** You just need to confirm the plugin is already in your Babel config — no further changes needed.
+> **Already have worklets configured?** Just confirm the relevant plugin line is present — no further changes needed.
 
 After updating the Babel config, clear the Metro cache:
 
