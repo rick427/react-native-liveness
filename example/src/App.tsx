@@ -33,8 +33,6 @@ export default function App() {
           onLivenessConfirmed={() => console.log('Liveness confirmed!')}
           onError={handleError}
           countdownFrom={3}
-          livenessThreshold={0.75}
-          confirmFrames={15}
           soundEnabled
         />
         <SafeAreaView style={styles.cancelRow} pointerEvents="box-none">
