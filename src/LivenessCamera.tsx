@@ -41,7 +41,7 @@ const DEFAULT_FONT = 'Baloo-Medium';
 const CIRCLE_DIAMETER_RATIO = 0.82;
 const STROKE_WIDTH = 3;
 const K = 0.5523; // cubic bezier ellipse approximation
-const SCAN_LINE_HEIGHT = 44; // px — height of the sweep bar
+const SCAN_LINE_HEIGHT = 2; // px — thin line, like a real liveness SDK
 const BRACKET_SPAN_DEG = 44; // degrees each corner bracket spans
 const BRACKET_STROKE = STROKE_WIDTH + 1;
 
@@ -160,8 +160,8 @@ function CircleOverlay({
   useEffect(() => {
     scanProgress.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 1800, easing: Easing.linear }),
-        withTiming(0, { duration: 1800, easing: Easing.linear })
+        withTiming(1, { duration: 2400, easing: Easing.linear }),
+        withTiming(0, { duration: 2400, easing: Easing.linear })
       ),
       -1,
       false
@@ -213,11 +213,11 @@ function CircleOverlay({
           <Circle cx={cx} cy={cy} r={r} />
         </ClipPath>
 
-        {/* Vertical gradient for the scan bar — fades at top and bottom */}
-        <LinearGradient id="scan-gradient" x1="0" y1="0" x2="0" y2="1">
+        {/* Horizontal gradient — line fades in from left, out to right */}
+        <LinearGradient id="scan-gradient" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor="#fff" stopOpacity="0" />
-          <Stop offset="0.25" stopColor="#fff" stopOpacity="0.65" />
-          <Stop offset="0.75" stopColor="#fff" stopOpacity="0.65" />
+          <Stop offset="0.08" stopColor="#fff" stopOpacity="0.55" />
+          <Stop offset="0.92" stopColor="#fff" stopOpacity="0.55" />
           <Stop offset="1" stopColor="#fff" stopOpacity="0" />
         </LinearGradient>
       </Defs>
