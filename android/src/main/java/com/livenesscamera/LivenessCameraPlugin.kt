@@ -8,8 +8,6 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.mrousavy.camera.frameprocessors.Frame
 import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 
-// Vision Camera v4.5+ removed VisionCameraProxyHolder and made FrameProcessorPlugin
-// a no-arg constructor. The proxy/options are no longer passed at construction time.
 class LivenessCameraPlugin : FrameProcessorPlugin() {
 
   private val faceDetector = FaceDetection.getClient(
@@ -23,8 +21,7 @@ class LivenessCameraPlugin : FrameProcessorPlugin() {
 
   /**
    * Convert Vision Camera's Orientation to ML Kit rotation degrees.
-   * Uses toString() comparison to stay resilient across VC patch versions
-   * where the Orientation API (toDegrees / toSurfaceRotation) may vary.
+   * Uses toString() to stay resilient across VC patch-version API churn.
    */
   private fun orientationDegrees(frame: Frame): Int {
     val name = frame.orientation.toString().uppercase()
@@ -52,20 +49,23 @@ class LivenessCameraPlugin : FrameProcessorPlugin() {
       val face = faces.first()
       val box = face.boundingBox
 
+      // IMPORTANT: All numeric values must be Double, not Float.
+      // JSI (Vision Camera's JS bridge) cannot convert Java Float → jsi::Value
+      // and throws "Cannot convert Java type class java.lang.Float" at runtime.
       mapOf(
         "detected" to true,
         "bounds" to mapOf(
-          "x" to box.left.toFloat(),
-          "y" to box.top.toFloat(),
-          "width" to box.width().toFloat(),
-          "height" to box.height().toFloat()
+          "x" to box.left.toDouble(),
+          "y" to box.top.toDouble(),
+          "width" to box.width().toDouble(),
+          "height" to box.height().toDouble()
         ),
-        "yawAngle" to face.headEulerAngleY,
-        "pitchAngle" to face.headEulerAngleX,
-        "rollAngle" to face.headEulerAngleZ,
-        "leftEyeOpenProbability" to (face.leftEyeOpenProbability ?: -1f),
-        "rightEyeOpenProbability" to (face.rightEyeOpenProbability ?: -1f),
-        "smilingProbability" to (face.smilingProbability ?: -1f)
+        "yawAngle" to face.headEulerAngleY.toDouble(),
+        "pitchAngle" to face.headEulerAngleX.toDouble(),
+        "rollAngle" to face.headEulerAngleZ.toDouble(),
+        "leftEyeOpenProbability" to (face.leftEyeOpenProbability?.toDouble() ?: -1.0),
+        "rightEyeOpenProbability" to (face.rightEyeOpenProbability?.toDouble() ?: -1.0),
+        "smilingProbability" to (face.smilingProbability?.toDouble() ?: -1.0)
       )
     } catch (e: Exception) {
       mapOf("detected" to false)

@@ -5,25 +5,37 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import { Circle, Ellipse, Path, Svg } from 'react-native-svg';
+import { Ellipse, Path, Svg } from 'react-native-svg';
 import { useLivenessCamera } from './useLivenessCamera';
 import type { LivenessCameraProps, LivenessState } from './types';
 
-const OVAL_H_RATIO = 0.55;
-const OVAL_V_RATIO = 0.72;
+// Oval is sized relative to container WIDTH only, so it stays face-shaped
+// on any screen. ry = rx * FACE_RATIO gives a natural portrait face oval.
+const OVAL_WIDTH_RATIO = 0.72; // oval width = 72 % of container width
+const FACE_RATIO = 1.35; // height-to-width ratio of the oval (~3:4 face)
 const STROKE_WIDTH = 3;
 // Cubic bezier approximation constant for a smooth ellipse
 const K = 0.5523;
 
-function getOvalColor(state: LivenessState): string {
+/**
+ * Returns the stroke colour for the oval guide.
+ *
+ *  ● White  – no face / scanning (score < 0.4)
+ *  ● Yellow – face detected, confidence building (0.4 ≤ score < threshold)
+ *  ● Green  – liveness confirmed / countdown / capture
+ *  ● Red    – error
+ */
+function getOvalColor(state: LivenessState, score: number): string {
   switch (state) {
+    case 'error':
+      return '#FF3B30';
     case 'confirmed':
     case 'countdown':
     case 'capturing':
     case 'done':
       return '#4CAF50';
     default:
-      return '#FFFFFF';
+      return score >= 0.4 ? '#FFD60A' : '#FFFFFF';
   }
 }
 
@@ -47,24 +59,24 @@ function OvalOverlay({
   width,
   height,
   state,
+  score,
 }: {
   width: number;
   height: number;
   state: LivenessState;
+  score: number;
 }) {
   if (width === 0 || height === 0) return null;
 
   const cx = width / 2;
-  const cy = height / 2;
-  const rx = (width * OVAL_H_RATIO) / 2;
-  const ry = (height * OVAL_V_RATIO) / 2;
-  const color = getOvalColor(state);
+  // Shift centre slightly above midpoint so the face sits naturally in frame
+  const cy = height * 0.45;
+  const rx = (width * OVAL_WIDTH_RATIO) / 2;
+  const ry = rx * FACE_RATIO;
+  const color = getOvalColor(state, score);
 
   // Compound path: outer rect + oval. evenodd fill rule makes the oval transparent.
   const scrimD = `M0 0H${width}V${height}H0Z ${ellipsePath(cx, cy, rx, ry)}`;
-
-  const showDot =
-    state === 'confirmed' || state === 'countdown' || state === 'capturing';
 
   return (
     <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
@@ -78,7 +90,6 @@ function OvalOverlay({
         stroke={color}
         strokeWidth={STROKE_WIDTH}
       />
-      {showDot && <Circle cx={cx} cy={cy - ry - 8} r={5} fill={color} />}
     </Svg>
   );
 }
@@ -145,7 +156,7 @@ export function LivenessCamera({
   const cameraRef = useRef<Camera>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  const { frameProcessor, livenessState, countdown, feedback } =
+  const { frameProcessor, livenessState, livenessScore, countdown, feedback } =
     useLivenessCamera({
       livenessThreshold,
       confirmFrames,
@@ -204,6 +215,7 @@ export function LivenessCamera({
         width={containerSize.width}
         height={containerSize.height}
         state={livenessState}
+        score={livenessScore}
       />
       {livenessState !== 'done' && (
         <View style={styles.feedbackContainer}>
@@ -240,7 +252,7 @@ const styles = StyleSheet.create({
   },
   feedbackContainer: {
     position: 'absolute',
-    bottom: '14%',
+    bottom: '12%',
     left: 0,
     right: 0,
     alignItems: 'center',
