@@ -1,29 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import {
   Camera,
   useCameraDevice,
   useCameraFormat,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import { Circle, Path, Svg } from 'react-native-svg';
+import {
+  Circle,
+  ClipPath,
+  Defs,
+  G,
+  LinearGradient,
+  Path,
+  Rect,
+  Stop,
+  Svg,
+} from 'react-native-svg';
 import { useLivenessCamera } from './useLivenessCamera';
 import type { LivenessCameraProps, LivenessState } from './types';
 
-const DEFAULT_FONT = 'Baloo-Medium';
+// ─── Animated SVG components ─────────────────────────────────────────────────
+// Created once at module level so React never recreates the component class.
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedG = Animated.createAnimatedComponent(G);
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
-// Circle diameter = 82 % of container width — large enough to fit any face
-// comfortably without the user needing to fiddle with distance.
+// ─── Constants ────────────────────────────────────────────────────────────────
+const DEFAULT_FONT = 'Baloo-Medium';
 const CIRCLE_DIAMETER_RATIO = 0.82;
 const STROKE_WIDTH = 3;
-// Cubic bezier approximation constant for a smooth circle path
-const K = 0.5523;
+const K = 0.5523; // cubic bezier ellipse approximation
+const SCAN_LINE_HEIGHT = 44; // px — height of the sweep bar
+const BRACKET_SPAN_DEG = 44; // degrees each corner bracket spans
+const BRACKET_STROKE = STROKE_WIDTH + 1;
 
+// ─── Colour helper ────────────────────────────────────────────────────────────
 /**
- * Returns the stroke colour for the circle guide.
- *
  *  ● White  – no face / scanning (score < 0.4)
- *  ● Yellow – face detected, confidence building (0.4 ≤ score < threshold)
+ *  ● Yellow – face detected, confidence building
  *  ● Green  – liveness confirmed / countdown / capture
  *  ● Red    – error
  */
@@ -41,11 +56,8 @@ function getCircleColor(state: LivenessState, score: number): string {
   }
 }
 
-/**
- * Returns an SVG path string tracing a circle at (cx, cy) with radius r
- * using cubic bezier curves. Used inside a compound path with
- * fillRule="evenodd" to punch a transparent hole through the dark scrim.
- */
+// ─── SVG path helpers ─────────────────────────────────────────────────────────
+/** Cubic bezier circle path — used inside compound evenodd scrim. */
 function circlePath(cx: number, cy: number, r: number): string {
   return [
     `M ${cx + r} ${cy}`,
@@ -57,41 +69,219 @@ function circlePath(cx: number, cy: number, r: number): string {
   ].join(' ');
 }
 
+/** One corner bracket arc centred at `centerDeg`, spanning `spanDeg`. */
+function bracketArcPath(
+  cx: number,
+  cy: number,
+  r: number,
+  centerDeg: number,
+  spanDeg: number
+): string {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const a1 = toRad(centerDeg - spanDeg / 2);
+  const a2 = toRad(centerDeg + spanDeg / 2);
+  const x1 = cx + r * Math.cos(a1);
+  const y1 = cy + r * Math.sin(a1);
+  const x2 = cx + r * Math.cos(a2);
+  const y2 = cy + r * Math.sin(a2);
+  return `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;
+}
+
+// ─── CircleOverlay ────────────────────────────────────────────────────────────
 function CircleOverlay({
   width,
   height,
   state,
   score,
+  livenessThreshold,
 }: {
   width: number;
   height: number;
   state: LivenessState;
   score: number;
+  livenessThreshold: number;
 }) {
+  // ── Animation values (must be declared before any early return) ────────────
+  const scanAnim = useRef(new Animated.Value(0)).current;
+  const scanOpacity = useRef(new Animated.Value(1)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const bracketAnim = useRef(new Animated.Value(0)).current;
+
+  const scanLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const bracketLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // ── Start scan line + bracket rotation on mount ───────────────────────────
+  useEffect(() => {
+    // Scan line: ping-pong top → bottom → top, 1.8 s each leg
+    scanLoopRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanAnim, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.linear,
+          useNativeDriver: false,
+        }),
+        Animated.timing(scanAnim, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.linear,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    scanLoopRef.current.start();
+
+    // Brackets: one full rotation every 6 s — slow, atmospheric
+    bracketLoopRef.current = Animated.loop(
+      Animated.timing(bracketAnim, {
+        toValue: 360,
+        duration: 6000,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      })
+    );
+    bracketLoopRef.current.start();
+
+    return () => {
+      scanLoopRef.current?.stop();
+      bracketLoopRef.current?.stop();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── On confirmed: stop scan + brackets, fade out scan line ────────────────
+  useEffect(() => {
+    const isActive = state === 'scanning';
+    if (!isActive) {
+      scanLoopRef.current?.stop();
+      bracketLoopRef.current?.stop();
+      Animated.timing(scanOpacity, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [state, scanOpacity]);
+
+  // ── Drive progress arc from live score ────────────────────────────────────
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: Math.min(score, livenessThreshold),
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  }, [score, livenessThreshold, progressAnim]);
+
+  // ── Guard — render nothing until dimensions are known ─────────────────────
   if (width === 0 || height === 0) return null;
 
+  // ── Geometry ──────────────────────────────────────────────────────────────
   const cx = width / 2;
   const cy = height * 0.42;
   const r = (width * CIRCLE_DIAMETER_RATIO) / 2;
+  const circumference = 2 * Math.PI * r;
   const color = getCircleColor(state, score);
 
+  // Scrim: full-screen dark rect with transparent circle hole
   const scrimD = `M0 0H${width}V${height}H0Z ${circlePath(cx, cy, r)}`;
+
+  // Scan line Y: sweeps from just inside top to just inside bottom of circle
+  const scanLineY = scanAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [cy - r + 2, cy + r - SCAN_LINE_HEIGHT - 2],
+  });
+
+  // Progress arc: strokeDashoffset goes from full (no arc) → 0 (full arc)
+  const strokeDashoffset = progressAnim.interpolate({
+    inputRange: [0, livenessThreshold],
+    outputRange: [circumference, 0],
+    extrapolate: 'clamp',
+  });
+
+  // Bracket group rotation — centred on the circle
+  const bracketTransform = bracketAnim.interpolate({
+    inputRange: [0, 360],
+    outputRange: [`rotate(0, ${cx}, ${cy})`, `rotate(360, ${cx}, ${cy})`],
+  });
+
+  // 4 corner brackets at NE / SE / SW / NW diagonal positions
+  const bracketD = [45, 135, 225, 315]
+    .map((deg) => bracketArcPath(cx, cy, r, deg, BRACKET_SPAN_DEG))
+    .join(' ');
 
   return (
     <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
+      {/* ── Definitions ─────────────────────────────────────────────────── */}
+      <Defs>
+        {/* Clip path: restrict scan line to circle area */}
+        <ClipPath id="liveness-circle-clip">
+          <Circle cx={cx} cy={cy} r={r} />
+        </ClipPath>
+
+        {/* Vertical gradient for the scan bar — fades at top and bottom */}
+        <LinearGradient id="scan-gradient" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#fff" stopOpacity="0" />
+          <Stop offset="0.25" stopColor="#fff" stopOpacity="0.65" />
+          <Stop offset="0.75" stopColor="#fff" stopOpacity="0.65" />
+          <Stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </LinearGradient>
+      </Defs>
+
+      {/* ── Dark scrim with transparent circle cutout ────────────────────── */}
       <Path d={scrimD} fill="rgba(0,0,0,0.55)" fillRule="evenodd" />
+
+      {/* ── Dim base ring — always shows the circle boundary ─────────────── */}
       <Circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke="rgba(255,255,255,0.18)"
+        strokeWidth={1}
+      />
+
+      {/* ── Scan line — sweeps top → bottom, clipped to circle ───────────── */}
+      <G clipPath="url(#liveness-circle-clip)">
+        <AnimatedRect
+          x={cx - r}
+          y={scanLineY}
+          width={r * 2}
+          height={SCAN_LINE_HEIGHT}
+          fill="url(#scan-gradient)"
+          opacity={scanOpacity}
+        />
+      </G>
+
+      {/* ── Rotating corner brackets ─────────────────────────────────────── */}
+      <AnimatedG transform={bracketTransform}>
+        <Path
+          d={bracketD}
+          fill="none"
+          stroke={color}
+          strokeWidth={BRACKET_STROKE}
+          strokeLinecap="round"
+          opacity={0.85}
+        />
+      </AnimatedG>
+
+      {/* ── Progress arc — draws in as liveness confidence builds ────────── */}
+      {/* Rotated -90° so it starts at 12 o'clock and goes clockwise */}
+      <AnimatedCircle
         cx={cx}
         cy={cy}
         r={r}
         fill="none"
         stroke={color}
         strokeWidth={STROKE_WIDTH}
+        strokeDasharray={circumference}
+        strokeDashoffset={strokeDashoffset}
+        strokeLinecap="round"
+        transform={`rotate(-90, ${cx}, ${cy})`}
       />
     </Svg>
   );
 }
 
+// ─── CountdownBubble ──────────────────────────────────────────────────────────
 function CountdownBubble({
   value,
   fontFamily,
@@ -143,6 +333,7 @@ function CountdownBubble({
   );
 }
 
+// ─── LivenessCamera ───────────────────────────────────────────────────────────
 export function LivenessCamera({
   onCapture,
   onLivenessConfirmed,
@@ -227,6 +418,7 @@ export function LivenessCamera({
         height={containerSize.height}
         state={livenessState}
         score={livenessScore}
+        livenessThreshold={livenessThreshold}
       />
       {livenessState !== 'done' && (
         <View style={styles.feedbackContainer}>
@@ -249,6 +441,7 @@ export function LivenessCamera({
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: {
     flex: 1,
