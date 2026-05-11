@@ -1,32 +1,19 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import {
   Camera,
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import {
-  Canvas,
-  Circle,
-  FillType,
-  Group,
-  Paint,
-  Path,
-  Skia,
-} from '@shopify/react-native-skia';
+import { Circle, Ellipse, Path, Svg } from 'react-native-svg';
 import { useLivenessCamera } from './useLivenessCamera';
 import type { LivenessCameraProps, LivenessState } from './types';
 
 const OVAL_H_RATIO = 0.55;
 const OVAL_V_RATIO = 0.72;
 const STROKE_WIDTH = 3;
+// Cubic bezier approximation constant for a smooth ellipse
+const K = 0.5523;
 
 function getOvalColor(state: LivenessState): string {
   switch (state) {
@@ -38,6 +25,27 @@ function getOvalColor(state: LivenessState): string {
     default:
       return '#FFFFFF';
   }
+}
+
+/**
+ * Returns an SVG path string tracing an ellipse (cx, cy, rx, ry) using
+ * cubic bezier curves. Used inside a compound path with fillRule="evenodd"
+ * to punch a transparent hole through the dark scrim.
+ */
+function ellipsePath(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number
+): string {
+  return [
+    `M ${cx + rx} ${cy}`,
+    `C ${cx + rx} ${cy - ry * K} ${cx + rx * K} ${cy - ry} ${cx} ${cy - ry}`,
+    `C ${cx - rx * K} ${cy - ry} ${cx - rx} ${cy - ry * K} ${cx - rx} ${cy}`,
+    `C ${cx - rx} ${cy + ry * K} ${cx - rx * K} ${cy + ry} ${cx} ${cy + ry}`,
+    `C ${cx + rx * K} ${cy + ry} ${cx + rx} ${cy + ry * K} ${cx + rx} ${cy}`,
+    'Z',
+  ].join(' ');
 }
 
 function OvalOverlay({
@@ -57,60 +65,71 @@ function OvalOverlay({
   const ry = (height * OVAL_V_RATIO) / 2;
   const color = getOvalColor(state);
 
-  const path = Skia.Path.Make();
-  path.addRect(Skia.XYWHRect(0, 0, width, height));
-  path.addOval(Skia.XYWHRect(cx - rx, cy - ry, rx * 2, ry * 2));
-  path.setFillType(FillType.EvenOdd);
-
-  const ovalPath = Skia.Path.Make();
-  ovalPath.addOval(Skia.XYWHRect(cx - rx, cy - ry, rx * 2, ry * 2));
+  // Compound path: outer rect + oval. evenodd fill rule makes the oval transparent.
+  const scrimD = `M0 0H${width}V${height}H0Z ${ellipsePath(cx, cy, rx, ry)}`;
 
   const showDot =
     state === 'confirmed' || state === 'countdown' || state === 'capturing';
 
   return (
-    <Canvas style={StyleSheet.absoluteFill}>
-      <Path path={path} color="rgba(0,0,0,0.55)" />
-      <Group>
-        <Path
-          path={ovalPath}
-          style="stroke"
-          strokeWidth={STROKE_WIDTH}
-          color={color}
-        />
-        {showDot && (
-          <Circle cx={cx} cy={cy - ry - 8} r={5} color={color}>
-            <Paint color={color} />
-          </Circle>
-        )}
-      </Group>
-    </Canvas>
+    <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
+      <Path d={scrimD} fill="rgba(0,0,0,0.55)" fillRule="evenodd" />
+      <Ellipse
+        cx={cx}
+        cy={cy}
+        rx={rx}
+        ry={ry}
+        fill="none"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+      />
+      {showDot && <Circle cx={cx} cy={cy - ry - 8} r={5} fill={color} />}
+    </Svg>
   );
 }
 
 function CountdownBubble({ value }: { value: number }) {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
+  // key={countdown} in the parent remounts this component on every tick,
+  // so [] deps are correct — each mount runs a fresh animation.
+  const scale = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    scale.value = withSequence(
-      withSpring(1.2, { damping: 6, stiffness: 200 }),
-      withSpring(1.0, { damping: 8, stiffness: 150 })
-    );
-    opacity.value = withTiming(1, { duration: 150 });
+    Animated.parallel([
+      Animated.sequence([
+        Animated.spring(scale, {
+          toValue: 1.2,
+          stiffness: 200,
+          damping: 6,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: 1.0,
+          stiffness: 150,
+          damping: 8,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     return () => {
-      opacity.value = withTiming(0, { duration: 200 });
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     };
-  }, [value, scale, opacity]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Animated.View style={[styles.countdownBubble, animatedStyle]}>
+    <Animated.View
+      style={[styles.countdownBubble, { opacity, transform: [{ scale }] }]}
+    >
       <Text style={styles.countdownText}>{value}</Text>
     </Animated.View>
   );
@@ -129,10 +148,7 @@ export function LivenessCamera({
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('front');
   const cameraRef = useRef<Camera>(null);
-  const [containerSize, setContainerSize] = React.useState({
-    width: 0,
-    height: 0,
-  });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const { frameProcessor, livenessState, countdown, feedback } =
     useLivenessCamera({
