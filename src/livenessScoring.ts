@@ -7,10 +7,14 @@ const WEIGHTS = {
   eyesOpen: 0.3,
 } as const;
 
-const FACE_SIZE_MIN = 0.2;
-const FACE_SIZE_MAX = 0.65;
-const MAX_YAW_DEG = 20;
-const MAX_PITCH_DEG = 20;
+// Loosened from 0.20 / 0.65 — gives more room for the user to breathe
+const FACE_SIZE_MIN = 0.15;
+const FACE_SIZE_MAX = 0.8;
+const FACE_SIZE_SOFT_MARGIN = 0.05; // gradient ramp at each edge
+
+// Loosened from 20° — ML Kit head pose is noisy, 25° still rejects clear tilts
+const MAX_YAW_DEG = 25;
+const MAX_PITCH_DEG = 25;
 
 export type FrameScore = {
   total: number;
@@ -25,14 +29,39 @@ export function scoreFrame(face: FaceData, frameWidth: number): FrameScore {
   }
 
   const faceWidthRatio = face.bounds.width / frameWidth;
-  const faceSize =
-    faceWidthRatio >= FACE_SIZE_MIN && faceWidthRatio <= FACE_SIZE_MAX
-      ? 1.0
-      : 0.0;
 
-  const yawOK = Math.abs(face.yawAngle) < MAX_YAW_DEG;
-  const pitchOK = Math.abs(face.pitchAngle) < MAX_PITCH_DEG;
-  const headPose = (yawOK ? 0.5 : 0) + (pitchOK ? 0.5 : 0);
+  // Soft-edge face size: smooth ramp into / out of the valid range so a face
+  // sitting just outside the threshold doesn't score hard 0.
+  let faceSize: number;
+  if (faceWidthRatio >= FACE_SIZE_MIN && faceWidthRatio <= FACE_SIZE_MAX) {
+    faceSize = 1.0;
+  } else if (faceWidthRatio < FACE_SIZE_MIN) {
+    faceSize = Math.max(
+      0,
+      (faceWidthRatio - (FACE_SIZE_MIN - FACE_SIZE_SOFT_MARGIN)) /
+        FACE_SIZE_SOFT_MARGIN
+    );
+  } else {
+    faceSize = Math.max(
+      0,
+      (FACE_SIZE_MAX + FACE_SIZE_SOFT_MARGIN - faceWidthRatio) /
+        FACE_SIZE_SOFT_MARGIN
+    );
+  }
+
+  // Soft-edge head pose: full score inside threshold, linear decay outside
+  const yawScore =
+    Math.abs(face.yawAngle) <= MAX_YAW_DEG
+      ? 1.0
+      : Math.max(0, 1 - (Math.abs(face.yawAngle) - MAX_YAW_DEG) / MAX_YAW_DEG);
+  const pitchScore =
+    Math.abs(face.pitchAngle) <= MAX_PITCH_DEG
+      ? 1.0
+      : Math.max(
+          0,
+          1 - (Math.abs(face.pitchAngle) - MAX_PITCH_DEG) / MAX_PITCH_DEG
+        );
+  const headPose = (yawScore + pitchScore) / 2;
 
   // ML Kit returns -1 when classification is disabled or unavailable
   const leftEye =
@@ -61,7 +90,7 @@ export function getFeedback(
   livenessConfirmed: boolean
 ): FeedbackMessage {
   if (livenessConfirmed) return 'Liveness confirmed';
-  if (!face.detected) return 'Position your face in the oval';
+  if (!face.detected) return 'Position your face in the circle';
 
   const faceWidthRatio = face.bounds.width / frameWidth;
   if (faceWidthRatio < FACE_SIZE_MIN) return 'Move closer';

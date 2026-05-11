@@ -5,27 +5,26 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import { Ellipse, Path, Svg } from 'react-native-svg';
+import { Circle, Path, Svg } from 'react-native-svg';
 import { useLivenessCamera } from './useLivenessCamera';
 import type { LivenessCameraProps, LivenessState } from './types';
 
-// Oval is sized relative to container WIDTH only, so it stays face-shaped
-// on any screen. ry = rx * FACE_RATIO gives a natural portrait face oval.
-const OVAL_WIDTH_RATIO = 0.72; // oval width = 72 % of container width
-const FACE_RATIO = 1.35; // height-to-width ratio of the oval (~3:4 face)
+// Circle diameter = 82 % of container width — large enough to fit any face
+// comfortably without the user needing to fiddle with distance.
+const CIRCLE_DIAMETER_RATIO = 0.82;
 const STROKE_WIDTH = 3;
-// Cubic bezier approximation constant for a smooth ellipse
+// Cubic bezier approximation constant for a smooth circle path
 const K = 0.5523;
 
 /**
- * Returns the stroke colour for the oval guide.
+ * Returns the stroke colour for the circle guide.
  *
  *  ● White  – no face / scanning (score < 0.4)
  *  ● Yellow – face detected, confidence building (0.4 ≤ score < threshold)
  *  ● Green  – liveness confirmed / countdown / capture
  *  ● Red    – error
  */
-function getOvalColor(state: LivenessState, score: number): string {
+function getCircleColor(state: LivenessState, score: number): string {
   switch (state) {
     case 'error':
       return '#FF3B30';
@@ -40,22 +39,22 @@ function getOvalColor(state: LivenessState, score: number): string {
 }
 
 /**
- * Returns an SVG path string tracing an ellipse (cx, cy, rx, ry) using
- * cubic bezier curves. Used inside a compound path with fillRule="evenodd"
- * to punch a transparent hole through the dark scrim.
+ * Returns an SVG path string tracing a circle at (cx, cy) with radius r
+ * using cubic bezier curves. Used inside a compound path with
+ * fillRule="evenodd" to punch a transparent hole through the dark scrim.
  */
-function ellipsePath(cx: number, cy: number, rx: number, ry: number): string {
+function circlePath(cx: number, cy: number, r: number): string {
   return [
-    `M ${cx + rx} ${cy}`,
-    `C ${cx + rx} ${cy - ry * K} ${cx + rx * K} ${cy - ry} ${cx} ${cy - ry}`,
-    `C ${cx - rx * K} ${cy - ry} ${cx - rx} ${cy - ry * K} ${cx - rx} ${cy}`,
-    `C ${cx - rx} ${cy + ry * K} ${cx - rx * K} ${cy + ry} ${cx} ${cy + ry}`,
-    `C ${cx + rx * K} ${cy + ry} ${cx + rx} ${cy + ry * K} ${cx + rx} ${cy}`,
+    `M ${cx + r} ${cy}`,
+    `C ${cx + r} ${cy - r * K} ${cx + r * K} ${cy - r} ${cx} ${cy - r}`,
+    `C ${cx - r * K} ${cy - r} ${cx - r} ${cy - r * K} ${cx - r} ${cy}`,
+    `C ${cx - r} ${cy + r * K} ${cx - r * K} ${cy + r} ${cx} ${cy + r}`,
+    `C ${cx + r * K} ${cy + r} ${cx + r} ${cy + r * K} ${cx + r} ${cy}`,
     'Z',
   ].join(' ');
 }
 
-function OvalOverlay({
+function CircleOverlay({
   width,
   height,
   state,
@@ -69,23 +68,22 @@ function OvalOverlay({
   if (width === 0 || height === 0) return null;
 
   const cx = width / 2;
-  // Shift centre slightly above midpoint so the face sits naturally in frame
-  const cy = height * 0.45;
-  const rx = (width * OVAL_WIDTH_RATIO) / 2;
-  const ry = rx * FACE_RATIO;
-  const color = getOvalColor(state, score);
+  // Centre the circle slightly above midpoint so the face sits naturally
+  const cy = height * 0.42;
+  const r = (width * CIRCLE_DIAMETER_RATIO) / 2;
+  const color = getCircleColor(state, score);
 
-  // Compound path: outer rect + oval. evenodd fill rule makes the oval transparent.
-  const scrimD = `M0 0H${width}V${height}H0Z ${ellipsePath(cx, cy, rx, ry)}`;
+  // Compound path: full-screen rect + circle cutout.
+  // evenodd fill rule makes the circle area transparent.
+  const scrimD = `M0 0H${width}V${height}H0Z ${circlePath(cx, cy, r)}`;
 
   return (
     <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
       <Path d={scrimD} fill="rgba(0,0,0,0.55)" fillRule="evenodd" />
-      <Ellipse
+      <Circle
         cx={cx}
         cy={cy}
-        rx={rx}
-        ry={ry}
+        r={r}
         fill="none"
         stroke={color}
         strokeWidth={STROKE_WIDTH}
@@ -147,7 +145,7 @@ export function LivenessCamera({
   onError,
   countdownFrom = 3,
   livenessThreshold = 0.75,
-  confirmFrames = 15,
+  confirmFrames = 10,
   soundEnabled = true,
   style,
 }: LivenessCameraProps) {
@@ -212,7 +210,7 @@ export function LivenessCamera({
         pixelFormat="yuv"
         fps={60}
       />
-      <OvalOverlay
+      <CircleOverlay
         width={containerSize.width}
         height={containerSize.height}
         state={livenessState}

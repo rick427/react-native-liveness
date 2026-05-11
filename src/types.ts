@@ -27,7 +27,7 @@ export type LivenessState =
   | 'error';
 
 export type FeedbackMessage =
-  | 'Position your face in the oval'
+  | 'Position your face in the circle'
   | 'Move closer'
   | 'Move farther away'
   | 'Look straight ahead'
@@ -71,7 +71,7 @@ export type LivenessCameraProps = {
 
   /**
    * Number of consecutive high-score frames required before liveness is
-   * confirmed. Defaults to 15 (~500ms at 30fps).
+   * confirmed. Defaults to 10 (~500ms at 20fps).
    */
   confirmFrames?: number;
 

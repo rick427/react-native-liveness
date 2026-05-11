@@ -12,6 +12,9 @@ import type {
 } from './types';
 
 const WINDOW_SIZE = 20;
+// How many frames to decay consecutiveGood by on a bad frame.
+// Decay (not hard reset) means one noisy frame won't erase all progress.
+const CONSECUTIVE_DECAY = 2;
 
 type Options = {
   livenessThreshold: number;
@@ -52,11 +55,20 @@ export function useLivenessCamera(options: Options) {
   const stateRef = useRef<LivenessState>('scanning');
   const isCaptured = useRef(false);
 
+  // Feedback debouncing: only update the displayed text after the same message
+  // has been stable for FEEDBACK_DEBOUNCE_MS. Prevents rapid flickering when
+  // ML Kit oscillates between two states on consecutive frames.
+  const FEEDBACK_DEBOUNCE_MS = 400;
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingFeedback = useRef<FeedbackMessage>(
+    'Position your face in the circle'
+  );
+
   const [state, setState] = useState<LivenessCameraState>({
     livenessState: 'scanning',
     livenessScore: 0,
     countdown: null,
-    feedback: 'Position your face in the oval',
+    feedback: 'Position your face in the circle',
   });
 
   const setLivenessState = useCallback((next: LivenessState) => {
@@ -143,19 +155,36 @@ export function useLivenessCamera(options: Options) {
 
       const avgScore = rollingAverage(frameScores.current);
 
+      // Decay on bad frames instead of hard reset — one noisy ML Kit result
+      // won't wipe out progress the user has already built up.
       if (total >= livenessThreshold) {
         consecutiveGood.current += 1;
       } else {
-        consecutiveGood.current = 0;
+        consecutiveGood.current = Math.max(
+          0,
+          consecutiveGood.current - CONSECUTIVE_DECAY
+        );
       }
 
       const isLive =
         consecutiveGood.current >= confirmFrames &&
         avgScore >= livenessThreshold;
 
-      const feedback = getFeedback(safeFace, width, isLive);
+      // Debounce the feedback text: only apply a new message after it has been
+      // stable for FEEDBACK_DEBOUNCE_MS, preventing rapid label flickering.
+      const newFeedback = getFeedback(safeFace, width, isLive);
+      if (newFeedback !== pendingFeedback.current) {
+        pendingFeedback.current = newFeedback;
+        if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+        feedbackTimer.current = setTimeout(() => {
+          setState((prev) => ({
+            ...prev,
+            feedback: pendingFeedback.current,
+          }));
+        }, FEEDBACK_DEBOUNCE_MS);
+      }
 
-      setState((prev) => ({ ...prev, livenessScore: avgScore, feedback }));
+      setState((prev) => ({ ...prev, livenessScore: avgScore }));
 
       if (isLive && stateRef.current === 'scanning') {
         setLivenessState('confirmed');
@@ -198,6 +227,7 @@ export function useLivenessCamera(options: Options) {
       frameScores.current = [];
       consecutiveGood.current = 0;
       isCaptured.current = false;
+      if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
     };
   }, []);
 
