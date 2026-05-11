@@ -1,4 +1,4 @@
-# react-native-liveness
+# @rick427/react-native-liveness
 
 A React Native library for real-time **liveness detection** using the device's front camera. Powered by [Vision Camera v4](https://github.com/mrousavy/react-native-vision-camera) and **ML Kit Face Detection** — no server required, fully on-device.
 
@@ -20,7 +20,7 @@ The library scores each camera frame against a set of liveness signals (face siz
 
 ## Prerequisites
 
-Install and link these peer dependencies in your project before using `react-native-liveness`:
+Install and link these peer dependencies in your project before using `@rick427/react-native-liveness`:
 
 | Package | Version |
 |---|---|
@@ -37,9 +37,9 @@ npm install react-native-vision-camera react-native-worklets-core react-native-s
 ## Installation
 
 ```sh
-npm install react-native-liveness
+npm install @rick427/react-native-liveness
 # or
-yarn add react-native-liveness
+yarn add @rick427/react-native-liveness
 ```
 
 Then install the peer dependencies if you haven't already:
@@ -75,8 +75,8 @@ The ML Kit dependency is included in `build.gradle` automatically. No extra step
 ### Drop-in component
 
 ```tsx
-import { LivenessCamera } from 'react-native-liveness';
-import type { CaptureResult } from 'react-native-liveness';
+import { LivenessCamera } from '@rick427/react-native-liveness';
+import type { CaptureResult } from '@rick427/react-native-liveness';
 
 export default function VerificationScreen() {
   const handleCapture = (result: CaptureResult) => {

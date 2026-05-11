@@ -1,5 +1,5 @@
 {
-  "name": "react-native-liveness",
+  "name": "@rick427/react-native-liveness",
   "version": "0.1.0",
   "description": "Liveness detection library for React Native using Vision Camera v4 and ML Kit",
   "main": "./lib/module/index.js",

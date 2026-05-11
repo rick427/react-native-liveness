@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LivenessCamera } from 'react-native-liveness';
-import type { CaptureResult } from 'react-native-liveness';
+import { LivenessCamera } from '@rick427/react-native-liveness';
+import type { CaptureResult } from '@rick427/react-native-liveness';
 
 export default function App() {
   const [result, setResult] = useState<CaptureResult | null>(null);
