@@ -18,22 +18,6 @@ The library scores each camera frame against a set of liveness signals (face siz
 
 ---
 
-## Prerequisites
-
-Install and link these peer dependencies in your project before using `@rick427/react-native-liveness`:
-
-| Package | Version |
-|---|---|
-| `react-native-vision-camera` | `>= 4.0.0` |
-| `react-native-worklets-core` | `>= 1.0.0` |
-| `react-native-svg` | `>= 13.0.0` |
-
-```sh
-npm install react-native-vision-camera react-native-worklets-core react-native-svg
-```
-
----
-
 ## Installation
 
 ```sh
@@ -42,16 +26,45 @@ npm install @rick427/react-native-liveness
 yarn add @rick427/react-native-liveness
 ```
 
-Then install the peer dependencies if you haven't already:
+### Peer dependencies
+
+Install these if you don't already have them:
+
+| Package | Version |
+|---|---|
+| `react-native-vision-camera` | `>= 4.0.0` |
+| `react-native-svg` | `>= 13.0.0` |
+| `react-native-worklets-core` | `>= 1.0.0` |
 
 ```sh
-npm install react-native-vision-camera react-native-worklets-core react-native-svg
-cd ios && pod install
+npm install react-native-vision-camera react-native-svg react-native-worklets-core
+```
+
+### Configure react-native-worklets-core
+
+The library uses Vision Camera frame processors which run in a worklet context. You must add the worklets-core Babel plugin to your `babel.config.js`:
+
+```js
+// babel.config.js
+module.exports = {
+  presets: ['module:@react-native/babel-preset'], // or 'babel-preset-expo'
+  plugins: [
+    'react-native-worklets-core/plugin', // ← add this
+  ],
+};
+```
+
+> **Already using `react-native-worklets-core`?** You just need to confirm the plugin is already in your Babel config — no further changes needed.
+
+After updating the Babel config, clear the Metro cache:
+
+```sh
+npx react-native start --reset-cache
+# or with Expo
+npx expo start --clear
 ```
 
 ### iOS
-
-Add the ML Kit pod (already declared in the podspec, but run pod install):
 
 ```sh
 cd ios && pod install
