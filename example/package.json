@@ -13,12 +13,12 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~55.0.11",
+    "@rick427/react-native-liveness": "*",
     "expo": "~55.0.23",
     "expo-status-bar": "~55.0.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
-    "@rick427/react-native-liveness": "*",
     "react-native-svg": "^15.0.0",
     "react-native-vision-camera": "^4.0.0",
     "react-native-web": "~0.21.0",

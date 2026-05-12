@@ -60,6 +60,10 @@ class LivenessCameraPlugin : FrameProcessorPlugin() {
           "width" to box.width().toDouble(),
           "height" to box.height().toDouble()
         ),
+        // Pass both buffer dimensions so JS can use the shorter side as the
+        // face-size reference (avoids landscape-vs-portrait ratio errors).
+        "frameWidth" to mediaImage.width.toDouble(),
+        "frameHeight" to mediaImage.height.toDouble(),
         "yawAngle" to face.headEulerAngleY.toDouble(),
         "pitchAngle" to face.headEulerAngleX.toDouble(),
         "rollAngle" to face.headEulerAngleZ.toDouble(),

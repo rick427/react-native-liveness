@@ -9,6 +9,10 @@ export type FaceData = {
     width: number;
     height: number;
   };
+  /** Raw buffer width as reported by the native plugin. */
+  frameWidth?: number;
+  /** Raw buffer height as reported by the native plugin. */
+  frameHeight?: number;
   yawAngle: number;
   pitchAngle: number;
   rollAngle: number;

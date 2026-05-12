@@ -9,17 +9,15 @@ public class LivenessCameraPlugin: FrameProcessorPlugin {
 
   private var faceDetector: FaceDetector
 
-  public override init(
-    proxy: VisionCameraProxyHolder,
-    options: [AnyHashable: Any]? = [:]
-  ) {
-    let detectorOptions = FaceDetectorOptions()
-    detectorOptions.performanceMode = .fast
-    detectorOptions.classificationMode = .all   // gives eye/smile probabilities
-    detectorOptions.landmarkMode = .none
-    detectorOptions.contourMode = .none
-    detectorOptions.isTrackingEnabled = false
-    self.faceDetector = FaceDetector.faceDetector(options: detectorOptions)
+  // VC v4.5+ removed VisionCameraProxyHolder — use the no-arg init instead.
+  public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable: Any]? = [:]) {
+    let opts = FaceDetectorOptions()
+    opts.performanceMode = .fast
+    opts.classificationMode = .all
+    opts.landmarkMode = .none
+    opts.contourMode = .none
+    opts.isTrackingEnabled = false
+    self.faceDetector = FaceDetector.faceDetector(options: opts)
     super.init(proxy: proxy, options: options)
   }
 
@@ -27,9 +25,8 @@ public class LivenessCameraPlugin: FrameProcessorPlugin {
     _ frame: Frame,
     withArguments arguments: [AnyHashable: Any]?
   ) -> Any {
-    // Vision Camera frames arrive rotated 90° — swap width/height for ML Kit
     let image = VisionImage(buffer: frame.buffer)
-    image.orientation = imageOrientation(from: frame.orientation)
+    image.orientation = uiOrientation(from: frame)
 
     do {
       let faces = try faceDetector.results(in: image)
@@ -37,33 +34,44 @@ public class LivenessCameraPlugin: FrameProcessorPlugin {
         return ["detected": false]
       }
 
+      // face.frame is in the coordinate space of the INPUT buffer (before rotation).
+      // Report the buffer dimensions so JS can pick the right reference axis.
+      let bufW = Double(CVPixelBufferGetWidth(frame.buffer))
+      let bufH = Double(CVPixelBufferGetHeight(frame.buffer))
+
       return [
         "detected": true,
         "bounds": [
-          "x": face.frame.origin.x,
-          "y": face.frame.origin.y,
-          "width": face.frame.size.width,
-          "height": face.frame.size.height,
+          "x": Double(face.frame.origin.x),
+          "y": Double(face.frame.origin.y),
+          "width": Double(face.frame.size.width),
+          "height": Double(face.frame.size.height),
         ],
-        "yawAngle": face.headEulerAngleY,
-        "pitchAngle": face.headEulerAngleX,
-        "rollAngle": face.headEulerAngleZ,
-        "leftEyeOpenProbability": face.leftEyeOpenProbability,
-        "rightEyeOpenProbability": face.rightEyeOpenProbability,
-        "smilingProbability": face.smilingProbability,
+        "frameWidth": bufW,
+        "frameHeight": bufH,
+        "yawAngle": Double(face.headEulerAngleY),
+        "pitchAngle": Double(face.headEulerAngleX),
+        "rollAngle": Double(face.headEulerAngleZ),
+        "leftEyeOpenProbability": Double(face.leftEyeOpenProbability),
+        "rightEyeOpenProbability": Double(face.rightEyeOpenProbability),
+        "smilingProbability": Double(face.smilingProbability),
       ]
     } catch {
       return ["detected": false]
     }
   }
 
-  // MARK: - Helpers
+  // MARK: - Orientation helper
 
-  private func imageOrientation(
-    from orientation: UIImage.Orientation
-  ) -> UIImage.Orientation {
-    // Vision Camera already exposes the correct UIImage.Orientation from
-    // frame.orientation in v4; return it directly for ML Kit.
-    return orientation
+  /// Map Vision Camera's frame orientation to the UIImage.Orientation that
+  /// ML Kit needs so it sees an upright face regardless of device rotation.
+  private func uiOrientation(from frame: Frame) -> UIImage.Orientation {
+    switch frame.orientation {
+    case .portrait:           return .right
+    case .portraitUpsideDown: return .left
+    case .landscapeLeft:      return .up
+    case .landscapeRight:     return .down
+    @unknown default:         return .right
+    }
   }
 }

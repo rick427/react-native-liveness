@@ -120,6 +120,24 @@ export function useLivenessCamera(options: Options) {
         smilingProbability: -1,
       };
 
+      if (__DEV__) {
+        const ref = Math.min(
+          safeFace.frameWidth ?? width,
+          safeFace.frameHeight ?? width
+        );
+        const ratio = safeFace.detected
+          ? (safeFace.bounds.width / ref).toFixed(3)
+          : 'n/a';
+        console.log(
+          `[Liveness] step=${currentStepIdx.current}` +
+            ` detected=${safeFace.detected}` +
+            ` ratio=${ratio}` +
+            ` yaw=${safeFace.yawAngle.toFixed(1)}` +
+            ` frameW=${safeFace.frameWidth ?? width}` +
+            ` frameH=${safeFace.frameHeight ?? 0}`
+        );
+      }
+
       const step = CHALLENGE_STEPS[currentStepIdx.current]!;
       const stepMet = step.check(safeFace, width);
 
